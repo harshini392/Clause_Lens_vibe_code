@@ -597,18 +597,27 @@ body {
 }
 
 /* Custom Checkboxes */
+.checkbox-label,
+.policy-check-item {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
 .checkbox-label {
     display: inline-flex;
     align-items: flex-start;
     gap: 10px;
-    cursor: pointer;
     font-size: 14px;
-    user-select: none;
 }
-.checkbox-label input[type="checkbox"] {
+.checkbox-label input[type="checkbox"],
+.policy-check-item input[type="checkbox"] {
     position: absolute;
     opacity: 0;
-    cursor: pointer;
+    width: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
 }
 .checkbox-custom {
     width: 18px;
@@ -621,11 +630,13 @@ body {
     position: relative;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
-.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom {
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom,
+.policy-check-item input[type="checkbox"]:checked ~ .checkbox-custom {
     background-color: var(--navy-accent);
     border-color: var(--navy-accent);
 }
-.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom::after {
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom::after,
+.policy-check-item input[type="checkbox"]:checked ~ .checkbox-custom::after {
     content: "✓";
     position: absolute;
     top: 50%;
@@ -634,6 +645,11 @@ body {
     color: #FFFFFF;
     font-size: 12px;
     font-weight: bold;
+}
+.checkbox-label input[type="checkbox"]:focus-visible ~ .checkbox-custom,
+.policy-check-item input[type="checkbox"]:focus-visible ~ .checkbox-custom {
+    outline: 2px solid var(--navy-accent);
+    outline-offset: 2px;
 }
 
 /* Progress Spinner */
@@ -1583,3 +1599,20 @@ body {
     font-weight: 500;
     line-height: 1.4;
 }
+
+/* History Table Actions Single Row */
+.td-actions {
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+.action-buttons-group {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    white-space: nowrap !important;
+}
+.action-buttons-group .btn {
+    white-space: nowrap !important;
+}
+

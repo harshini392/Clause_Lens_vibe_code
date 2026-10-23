@@ -449,7 +449,7 @@
         }
 
         policies.forEach(p => {
-            const itemLabel = createEl("label", "policy-check-item default-policy-item");
+            const itemLabel = createEl("label", "checkbox-label policy-check-item default-policy-item");
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.value = p.policy_key;
@@ -539,7 +539,7 @@
         }
 
         policies.forEach(p => {
-            const itemLabel = createEl("label", "policy-check-item");
+            const itemLabel = createEl("label", "checkbox-label policy-check-item");
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.value = p.id;
@@ -751,12 +751,14 @@
         }
 
         // Summary Strip Profile
-        if (analysis.domain && analysis.document_type) {
-            let profileText = `${analysis.domain} · ${analysis.document_type}`;
-            if (analysis.jurisdiction) profileText += ` (${analysis.jurisdiction})`;
-            el.summaryDomainProfile.textContent = profileText;
-        } else {
-            el.summaryDomainProfile.textContent = "General";
+        if (el.summaryDomainProfile) {
+            if (analysis.domain && analysis.document_type) {
+                let profileText = `${analysis.domain} · ${analysis.document_type}`;
+                if (analysis.jurisdiction) profileText += ` (${analysis.jurisdiction})`;
+                el.summaryDomainProfile.textContent = profileText;
+            } else {
+                el.summaryDomainProfile.textContent = "General";
+            }
         }
 
         // Download Report Button Link
@@ -782,16 +784,18 @@
         }
 
         // Summary counts
-        el.summaryConflictsCount.textContent = summary.potential_conflicts || 0;
-        el.summaryReviewsCount.textContent = summary.review_recommended || 0;
-        el.summaryNoConflictsCount.textContent = summary.no_conflict_detected || 0;
+        if (el.summaryConflictsCount) el.summaryConflictsCount.textContent = summary.potential_conflicts || 0;
+        if (el.summaryReviewsCount) el.summaryReviewsCount.textContent = summary.review_recommended || 0;
+        if (el.summaryNoConflictsCount) el.summaryNoConflictsCount.textContent = summary.no_conflict_detected || 0;
 
         // Policies evaluated list
-        const policiesSnapshot = analysis.policies_snapshot || [];
-        if (policiesSnapshot.length > 0) {
-            el.summaryPoliciesList.textContent = policiesSnapshot.map(p => p.name).join(", ");
-        } else {
-            el.summaryPoliciesList.textContent = "None";
+        if (el.summaryPoliciesList) {
+            const policiesSnapshot = analysis.policies_snapshot || [];
+            if (policiesSnapshot.length > 0) {
+                el.summaryPoliciesList.textContent = policiesSnapshot.map(p => p.name).join(", ");
+            } else {
+                el.summaryPoliciesList.textContent = "None";
+            }
         }
 
         // Filter Counts
@@ -1419,6 +1423,8 @@
                 tr.appendChild(tdRev);
 
                 const tdAction = document.createElement("td");
+                tdAction.className = "td-actions";
+                const actionGroup = createEl("div", "action-buttons-group");
                 const openBtn = createEl("button", "btn btn-secondary btn-sm", "Open");
                 openBtn.addEventListener("click", () => navigate(`review/${item.id}`));
 
@@ -1429,9 +1435,9 @@
                     }
                 });
 
-                tdAction.appendChild(openBtn);
-                tdAction.appendChild(document.createTextNode(" "));
-                tdAction.appendChild(delBtn);
+                actionGroup.appendChild(openBtn);
+                actionGroup.appendChild(delBtn);
+                tdAction.appendChild(actionGroup);
                 tr.appendChild(tdAction);
 
                 el.historyTableBody.appendChild(tr);

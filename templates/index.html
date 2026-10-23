@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ClauseLens — Privacy-First Contract Policy Verification</title>
     <meta name="description" content="ClauseLens verifies uploaded contracts (PDF or DOCX) against your own policies with evidence-backed findings. 100% local, zero cloud dependencies.">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=4">
 </head>
 <body>
     <!-- Top Mobile Navigation Toggle -->
@@ -339,33 +339,6 @@
                     </div>
                 </div>
 
-                <!-- Summary Strip -->
-                <div class="review-summary-strip">
-                    <div class="summary-pill pill-domain">
-                        <span class="pill-icon" aria-hidden="true">🏛️</span>
-                        <span class="pill-label">Profile:</span>
-                        <span id="summaryDomainProfile" class="pill-value-strong">General</span>
-                    </div>
-                    <div class="summary-pill pill-conflict">
-                        <span class="pill-icon" aria-hidden="true">⚠️</span>
-                        <span class="pill-count" id="summaryConflictsCount">0</span>
-                        <span class="pill-label">Potential Conflicts</span>
-                    </div>
-                    <div class="summary-pill pill-review">
-                        <span class="pill-icon" aria-hidden="true">🔎</span>
-                        <span class="pill-count" id="summaryReviewsCount">0</span>
-                        <span class="pill-label">Review Recommended</span>
-                    </div>
-                    <div class="summary-pill pill-ok">
-                        <span class="pill-icon" aria-hidden="true">✓</span>
-                        <span class="pill-count" id="summaryNoConflictsCount">0</span>
-                        <span class="pill-label">No Conflict Detected</span>
-                    </div>
-                    <div class="summary-policies-used">
-                        <span class="policies-used-label">Policies Evaluated:</span>
-                        <span id="summaryPoliciesList" class="policies-used-list">None</span>
-                    </div>
-                </div>
 
                 <!-- Mobile Switcher (Visible on narrow screens) -->
                 <div class="mobile-review-tabs" role="tablist">
@@ -483,7 +456,7 @@
                                         <th scope="col">Status</th>
                                         <th scope="col">Potential Conflicts</th>
                                         <th scope="col">Review Recommended</th>
-                                        <th scope="col">Actions</th>
+                                        <th scope="col" class="td-actions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="historyTableBody"></tbody>
@@ -626,6 +599,6 @@
     </div>
 
     <!-- Application Script (Vanilla JS, Zero Dependencies) -->
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=4"></script>
 </body>
 </html>
