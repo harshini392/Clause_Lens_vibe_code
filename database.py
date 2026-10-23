@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import config
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def get_db(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -22,14 +22,17 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     """Safely apply backward-compatible schema migrations."""
     cur = conn.cursor()
 
-    # 1. Safely add domain-specific columns to analyses table if missing
+    # 1. Safely add domain and multi-agent columns to analyses table if missing
     cur.execute("PRAGMA table_info(analyses);")
     existing_analyses_cols = {r["name"] for r in cur.fetchall()}
     analyses_new_cols = [
         ("domain", "TEXT"),
         ("document_type", "TEXT"),
         ("jurisdiction", "TEXT"),
-        ("issuing_authority", "TEXT")
+        ("issuing_authority", "TEXT"),
+        ("analysis_mode", "TEXT DEFAULT 'standard'"),
+        ("multi_agent_status", "TEXT DEFAULT 'disabled'"),
+        ("agent_summary_json", "TEXT DEFAULT '{}'")
     ]
     for col_name, col_type in analyses_new_cols:
         if col_name not in existing_analyses_cols:
@@ -179,7 +182,10 @@ def init_db(db_path: Optional[str] = None) -> None:
                     domain TEXT,
                     document_type TEXT,
                     jurisdiction TEXT,
-                    issuing_authority TEXT
+                    issuing_authority TEXT,
+                    analysis_mode TEXT DEFAULT 'standard',
+                    multi_agent_status TEXT DEFAULT 'disabled',
+                    agent_summary_json TEXT DEFAULT '{}'
                 );
             """)
 

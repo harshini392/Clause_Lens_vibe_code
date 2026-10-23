@@ -25,6 +25,7 @@ import services.rule_engine as rule_engine
 import services.report_service as report_service
 import services.nemotron_service as nemotron_service
 import services.default_policy_service as default_policy_service
+import services.multi_agent_service as multi_agent_service
 
 # Logging setup: log system events only, NEVER document text
 logging.basicConfig(
@@ -198,6 +199,15 @@ def health():
             "configured": nemotron_configured,
             "enabled_by_default": config.NEMOTRON_ENABLED,
             "reachable": None
+        },
+        "multi_agent": {
+            "available": nemotron_configured,
+            "supported_agents": [
+                "Clause Analysis Agent",
+                "Policy Compliance Agent",
+                "Risk Review Agent",
+                "Evidence Validation Agent"
+            ]
         },
         "retention_days": config.RETENTION_DAYS
     })
@@ -511,6 +521,9 @@ def analyze_contract():
         conn.close()
 
     use_nemotron_opt_in = request.form.get("use_nemotron", "false").lower() in ("true", "1", "yes")
+    use_multi_agent = request.form.get("use_multi_agent", "false").lower() in ("true", "1", "yes")
+    if use_multi_agent:
+        use_nemotron_opt_in = True
 
     # Merge default policies and user policies
     if has_domain_profile:
@@ -556,8 +569,9 @@ def analyze_contract():
                         INSERT INTO analyses (
                             id, filename, file_type, page_count_or_paragraph_count, text_length,
                             extraction_status, nemotron_used, nemotron_note, policies_snapshot_json,
-                            created_at, expires_at, domain, document_type, jurisdiction, issuing_authority
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                            created_at, expires_at, domain, document_type, jurisdiction, issuing_authority,
+                            analysis_mode, multi_agent_status, agent_summary_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """, (
                         analysis_id, display_name, file_type, count, 0,
                         "scanned_no_text", 0, "OCR is required and not enabled.",
@@ -570,7 +584,10 @@ def analyze_contract():
                             "policies": []
                         }),
                         now_iso, expires_at_iso,
-                        domain, document_type, jurisdiction, issuing_authority
+                        domain, document_type, jurisdiction, issuing_authority,
+                        "multi_agent" if use_multi_agent else "standard",
+                        "disabled" if not use_multi_agent else "unavailable",
+                        json.dumps({})
                     ))
             finally:
                 conn.close()
@@ -591,6 +608,9 @@ def analyze_contract():
                     "jurisdiction": jurisdiction,
                     "issuing_authority": issuing_authority
                 },
+                "analysis_mode": "multi_agent" if use_multi_agent else "standard",
+                "multi_agent_status": "disabled" if not use_multi_agent else "unavailable",
+                "agent_summary": {},
                 "nemotron": {
                     "requested": use_nemotron_opt_in,
                     "used": False,
@@ -611,38 +631,63 @@ def analyze_contract():
         # Detect clauses
         detected_clauses = clause_detector.detect_clauses_in_segments(segments, analysis_id)
 
-        # Nemotron optional interpretation (P2)
-        nemotron_used = False
-        nemotron_note = "Advanced interpretation was not used. Results are rule-based."
+        # Multi-Agent Orchestration / Deterministic Rule Engine
+        if use_multi_agent:
+            orchestrator = multi_agent_service.MultiAgentOrchestrator()
+            agent_result = orchestrator.run_pipeline(
+                segments=segments,
+                detected_clauses=detected_clauses,
+                merged_policies=merged_policies,
+                segments_by_ev_id=segments_by_ev_id,
+                analysis_id=analysis_id,
+                use_multi_agent=True
+            )
+            findings = agent_result["findings"]
+            analysis_mode = agent_result["analysis_mode"]
+            multi_agent_status = agent_result["multi_agent_status"]
+            agent_summary = agent_result["agent_summary"]
+            nemotron_used = (multi_agent_status in ("completed", "partial"))
+            nemotron_note = "; ".join(agent_result.get("notes", [])) if agent_result.get("notes") else "Multi-agent review completed."
+        else:
+            # Mode A: Standard Deterministic Analysis (with optional Nemotron single-agent if opt-in checked)
+            analysis_mode = "standard"
+            multi_agent_status = "disabled"
+            agent_summary = {
+                "clause_analysis": "skipped",
+                "policy_compliance": "skipped",
+                "risk_review": "skipped",
+                "evidence_validation": "skipped",
+                "final_evaluation": "completed"
+            }
+            nemotron_used = False
+            nemotron_note = "Advanced interpretation was not used. Results are rule-based."
 
-        if use_nemotron_opt_in:
-            if nemotron_service.is_nemotron_configured():
-                # Identify ambiguous segments
-                ambiguous_ev_ids = {cl["evidence_id"] for cl in detected_clauses if cl.get("confidence") != "high"}
-                ambiguous_segs = [s for s in segments if s["evidence_id"] in ambiguous_ev_ids]
-                high_conf_facts = {cl["category"]: cl["facts"] for cl in detected_clauses if cl.get("confidence") == "high"}
+            if use_nemotron_opt_in:
+                if nemotron_service.is_nemotron_configured():
+                    ambiguous_ev_ids = {cl["evidence_id"] for cl in detected_clauses if cl.get("confidence") != "high"}
+                    ambiguous_segs = [s for s in segments if s["evidence_id"] in ambiguous_ev_ids]
+                    high_conf_facts = {cl["category"]: cl["facts"] for cl in detected_clauses if cl.get("confidence") == "high"}
 
-                success, refined, note = nemotron_service.call_nemotron_interpret(ambiguous_segs, high_conf_facts)
-                nemotron_used = success
-                nemotron_note = note
-                if success and refined:
-                    for ref_item in refined:
-                        detected_clauses.append({
-                            "analysis_id": analysis_id,
-                            "evidence_id": ref_item["evidence_ids"][0],
-                            "category": ref_item["clause_type"],
-                            "facts": ref_item["facts"],
-                            "confidence": "medium",
-                            "source": "nemotron",
-                            "review_status": "unreviewed"
-                        })
-            else:
-                nemotron_note = "Nemotron service is not configured or disabled in environment."
+                    success, refined, note = nemotron_service.call_nemotron_interpret(ambiguous_segs, high_conf_facts)
+                    nemotron_used = success
+                    nemotron_note = note
+                    if success and refined:
+                        for ref_item in refined:
+                            detected_clauses.append({
+                                "analysis_id": analysis_id,
+                                "evidence_id": ref_item["evidence_ids"][0],
+                                "category": ref_item["clause_type"],
+                                "facts": ref_item["facts"],
+                                "confidence": "medium",
+                                "source": "nemotron",
+                                "review_status": "unreviewed"
+                            })
+                else:
+                    nemotron_note = "Nemotron service is not configured or disabled in environment."
 
-        # Evaluate deterministic rules against merged policies
-        findings = rule_engine.evaluate_rules(
-            detected_clauses, merged_policies, segments_by_ev_id, analysis_id, segments=segments
-        )
+            findings = rule_engine.evaluate_rules(
+                detected_clauses, merged_policies, segments_by_ev_id, analysis_id, segments=segments
+            )
 
         # Persist everything atomically to SQLite
         policies_snapshot_payload = {
@@ -664,13 +709,15 @@ def analyze_contract():
                     INSERT INTO analyses (
                         id, filename, file_type, page_count_or_paragraph_count, text_length,
                         extraction_status, nemotron_used, nemotron_note, policies_snapshot_json,
-                        created_at, expires_at, domain, document_type, jurisdiction, issuing_authority
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        created_at, expires_at, domain, document_type, jurisdiction, issuing_authority,
+                        analysis_mode, multi_agent_status, agent_summary_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, (
                     analysis_id, display_name, file_type, count, text_length,
                     extraction_status, 1 if nemotron_used else 0, nemotron_note,
                     policies_snapshot_json, now_iso, expires_at_iso,
-                    domain, document_type, jurisdiction, issuing_authority
+                    domain, document_type, jurisdiction, issuing_authority,
+                    analysis_mode, multi_agent_status, json.dumps(agent_summary)
                 ))
 
                 # 2. Insert segments
@@ -731,6 +778,9 @@ def analyze_contract():
                 "jurisdiction": jurisdiction,
                 "issuing_authority": issuing_authority
             },
+            "analysis_mode": analysis_mode,
+            "multi_agent_status": multi_agent_status,
+            "agent_summary": agent_summary,
             "nemotron": {
                 "requested": use_nemotron_opt_in,
                 "used": nemotron_used,
@@ -795,6 +845,8 @@ def get_history():
                 "text_length": r["text_length"],
                 "extraction_status": r["extraction_status"],
                 "nemotron_used": bool(r["nemotron_used"]),
+                "analysis_mode": r["analysis_mode"] if "analysis_mode" in r.keys() else "standard",
+                "multi_agent_status": r["multi_agent_status"] if "multi_agent_status" in r.keys() else "disabled",
                 "created_at": r["created_at"],
                 "expires_at": r["expires_at"],
                 "summary": {
@@ -820,6 +872,13 @@ def get_analysis_details(analysis_id: str):
             return jsonify({"error": {"code": "not_found", "message": f"Analysis '{analysis_id}' not found."}}), 404
 
         analysis = dict(analysis_row)
+        analysis["analysis_mode"] = analysis.get("analysis_mode") or "standard"
+        analysis["multi_agent_status"] = analysis.get("multi_agent_status") or "disabled"
+        try:
+            analysis["agent_summary"] = json.loads(analysis.get("agent_summary_json") or "{}")
+        except Exception:
+            analysis["agent_summary"] = {}
+
         try:
             raw_snap = json.loads(analysis.get("policies_snapshot_json", "[]"))
             if isinstance(raw_snap, dict) and "policies" in raw_snap:

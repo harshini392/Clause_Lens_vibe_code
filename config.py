@@ -4,6 +4,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# Load .env file if present
+_env_path = BASE_DIR / ".env"
+if _env_path.is_file():
+    try:
+        with open(_env_path, "r", encoding="utf-8") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _v = _line.split("=", 1)
+                    os.environ.setdefault(_k.strip(), _v.strip())
+    except Exception:
+        pass
+
 # Server
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "5000"))

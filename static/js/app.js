@@ -934,39 +934,16 @@
         // Metadata Row
         const metaRow = createEl("div", "finding-meta-row");
         const catTag = createEl("span", "meta-tag", (finding.category || "").toUpperCase());
-        const locTag = createEl("span", "meta-tag", finding.location_label || "Document-wide");
-
         metaRow.appendChild(catTag);
-        metaRow.appendChild(locTag);
 
         let policySnap = null;
         try {
             policySnap = JSON.parse(finding.policy_snapshot_json);
         } catch (_) {}
 
-        if (policySnap) {
-            const isDefault = policySnap.source === "domain_default";
-            const srcBadge = createEl(
-                "span",
-                `meta-tag ${isDefault ? "meta-tag-default" : "meta-tag-user"}`,
-                isDefault ? "Domain Default" : "My Policy"
-            );
-            metaRow.appendChild(srcBadge);
-
-            if (isDefault && policySnap.requirement_level) {
-                const isMandatory = policySnap.requirement_level.toLowerCase() === "mandatory";
-                const reqTag = createEl(
-                    "span",
-                    `meta-tag ${isMandatory ? "meta-tag-mandatory" : "meta-tag-recommended"}`,
-                    isMandatory ? "Mandatory" : "Recommended"
-                );
-                metaRow.appendChild(reqTag);
-            }
-
-            if (policySnap.name) {
-                const polTag = createEl("span", "meta-policy", `Policy: ${policySnap.name}`);
-                metaRow.appendChild(polTag);
-            }
+        if (policySnap && policySnap.name) {
+            const polTag = createEl("span", "meta-policy", `Policy: ${policySnap.name}`);
+            metaRow.appendChild(polTag);
         }
         card.appendChild(metaRow);
 
@@ -981,16 +958,6 @@
         // Plain-Language Explanation (XSS safe)
         const expP = createEl("p", "finding-explanation", finding.explanation);
         card.appendChild(expP);
-
-        // Verified Quote Box
-        if (finding.quote && finding.quote !== "No matching clause detected in document.") {
-            const quoteBox = createEl("div", "finding-quote-box");
-            const qLabel = createEl("span", "quote-label", `Verified Quote (${finding.location_label}):`);
-            const qText = createEl("span", null, `"${finding.quote}"`);
-            quoteBox.appendChild(qLabel);
-            quoteBox.appendChild(qText);
-            card.appendChild(quoteBox);
-        }
 
         // Actionable Next Step Box
         if (finding.next_step) {
