@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClauseLens — Privacy-First Contract Policy Verification</title>
+    <meta name="description" content="ClauseLens verifies uploaded contracts (PDF or DOCX) against your own policies with evidence-backed findings. 100% local, zero cloud dependencies.">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Top Mobile Navigation Toggle -->
+    <header class="top-nav-bar" role="banner">
+        <div class="brand">
+            <span class="brand-icon" aria-hidden="true">🔍</span>
+            <span class="brand-name">ClauseLens</span>
+            <span class="brand-tag">Policy Verification</span>
+        </div>
+        <button id="mobileNavToggle" class="mobile-toggle-btn" aria-label="Toggle Navigation Menu" aria-expanded="false">
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+            <span class="hamburger-bar"></span>
+        </button>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="sidebar" role="navigation" aria-label="Main Navigation">
+            <div class="sidebar-header">
+                <div class="brand-logo">
+                    <span class="brand-symbol" aria-hidden="true">⚖️</span>
+                    <span class="brand-title">ClauseLens</span>
+                </div>
+                <div class="sidebar-privacy-badge" title="Local-Only Sandbox">
+                    <span class="privacy-dot" aria-hidden="true"></span>
+                    <span class="privacy-text">Local &amp; Private</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" id="nav-dashboard" class="nav-item active" aria-current="page">
+                    <span class="nav-icon" aria-hidden="true">📊</span>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+                <a href="#new-analysis" id="nav-new-analysis" class="nav-item">
+                    <span class="nav-icon" aria-hidden="true">📄</span>
+                    <span class="nav-label">New Analysis</span>
+                </a>
+                <a href="#policies" id="nav-policies" class="nav-item">
+                    <span class="nav-icon" aria-hidden="true">🛡️</span>
+                    <span class="nav-label">My Policies</span>
+                </a>
+                <a href="#history" id="nav-history" class="nav-item">
+                    <span class="nav-icon" aria-hidden="true">🗂️</span>
+                    <span class="nav-label">Analysis History</span>
+                </a>
+                <a href="#about" id="nav-about" class="nav-item">
+                    <span class="nav-icon" aria-hidden="true">ℹ️</span>
+                    <span class="nav-label">About &amp; Privacy</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="disclaimer-mini">
+                    Policy assistance, not legal advice. Does not declare contracts safe.
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area with View Switching -->
+        <main id="mainContent" class="main-content" role="main">
+            <!-- Toast notification container -->
+            <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+            <!-- View: Dashboard -->
+            <section id="view-dashboard" class="view-section active">
+                <div class="view-header">
+                    <h1 class="view-title">Contract Policy Dashboard</h1>
+                    <p class="view-subtitle">Review real-time metrics, active policies, and recent contract evaluations.</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon-blue" aria-hidden="true">📑</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Documents Analyzed</span>
+                            <span id="stat-docs" class="stat-value">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon-red" aria-hidden="true">⚠️</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Potential Conflicts</span>
+                            <span id="stat-conflicts" class="stat-value">0</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon stat-icon-amber" aria-hidden="true">🔎</div>
+                        <div class="stat-content">
+                            <span class="stat-label">Manual Reviews Needed</span>
+                            <span id="stat-manual" class="stat-value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-actions-card">
+                    <div class="dash-action-text">
+                        <h2>Ready to verify a new contract?</h2>
+                        <p>Upload a PDF or Word (.docx) document to evaluate it against your organization's custom policies.</p>
+                    </div>
+                    <div class="dash-action-buttons">
+                        <a href="#new-analysis" class="btn btn-primary" id="dashStartBtn">
+                            <span aria-hidden="true">⚡</span> Start New Analysis
+                        </a>
+                        <a href="#policies" class="btn btn-secondary">
+                            <span aria-hidden="true">⚙️</span> Configure Policies
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card recent-table-card">
+                    <div class="card-header">
+                        <h2>Recent Contract Analyses</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentEmptyState" class="empty-state">
+                            <span class="empty-icon" aria-hidden="true">📂</span>
+                            <p class="empty-title">No contract analyses yet</p>
+                            <p class="empty-desc">Upload your first agreement to see verified policy findings and quotes.</p>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="recentTable" class="data-table hidden" aria-label="Recent Analyses Table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Contract Name</th>
+                                        <th scope="col">Type</th>
+                                        <th scope="col">Date Analyzed</th>
+                                        <th scope="col">Potential Conflicts</th>
+                                        <th scope="col">Reviews Recommended</th>
+                                        <th scope="col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: New Analysis -->
+            <section id="view-new-analysis" class="view-section">
+                <div class="view-header">
+                    <h1 class="view-title">New Contract Analysis</h1>
+                    <p class="view-subtitle">Select an agreement file (PDF or DOCX) and configure the policies to verify.</p>
+                </div>
+
+                <div class="analysis-form-grid">
+                    <div class="card upload-card">
+                        <div class="card-header">
+                            <h2>1. Select Contract File</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="File upload dropzone">
+                                <span class="drop-icon" aria-hidden="true">📤</span>
+                                <p class="drop-main-text">Drag and drop your contract here, or <span class="browse-link">browse</span></p>
+                                <p class="drop-sub-text">Supported: <b>PDF</b> or <b>DOCX</b> (up to 15 MB). Never sent to any external server by default.</p>
+                                <input type="file" id="contractFileInput" accept=".pdf,.docx" class="visually-hidden" aria-label="Upload Contract File">
+                            </div>
+
+                            <div id="fileSelectedInfo" class="file-selected-box hidden">
+                                <div class="file-info-icon" aria-hidden="true">📄</div>
+                                <div class="file-info-details">
+                                    <span id="selectedFileName" class="file-name-text"></span>
+                                    <span id="selectedFileSize" class="file-size-text"></span>
+                                </div>
+                                <button type="button" id="removeFileBtn" class="btn-icon" aria-label="Remove selected file">✕</button>
+                            </div>
+
+                            <div class="sample-shortcuts">
+                                <span class="shortcuts-label">Quick Demo Samples:</span>
+                                <div class="sample-chips">
+                                    <button type="button" class="sample-chip" data-sample="risky_services_agreement.pdf">Risky Agreement (PDF)</button>
+                                    <button type="button" class="sample-chip" data-sample="compliant_services_agreement.pdf">Compliant Agreement (PDF)</button>
+                                    <button type="button" class="sample-chip" data-sample="ambiguous_agreement.docx">Ambiguous Agreement (DOCX)</button>
+                                    <button type="button" class="sample-chip" data-sample="india_freelance_agreement.pdf">India Freelance (PDF)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card policy-select-card">
+                        <div class="card-header">
+                            <h2>2. Active Policies to Check</h2>
+                            <button type="button" id="toggleAllPoliciesBtn" class="btn-text-action">Select All</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-help-text">Choose which of your policies should be evaluated against this contract:</p>
+                            <div id="policyChecklist" class="policy-checklist" role="group" aria-label="Policy Selection List">
+                                <!-- Dynamically populated -->
+                            </div>
+
+                            <div class="nemotron-optin-box">
+                                <label class="checkbox-label nemotron-label">
+                                    <input type="checkbox" id="nemotronOptIn">
+                                    <span class="checkbox-custom"></span>
+                                    <span class="nemotron-text-group">
+                                        <span class="nemotron-title">Opt-in to Advanced AI Interpretation (Nemotron P2)</span>
+                                        <span class="nemotron-warning">Warning: Contract text for ambiguous clauses will be sent to the configured external model service.</span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="submit-action-row">
+                                <button type="button" id="startAnalyzeBtn" class="btn btn-primary btn-large" disabled>
+                                    <span id="analyzeBtnSpinner" class="spinner hidden" aria-hidden="true"></span>
+                                    <span id="analyzeBtnText">Analyze Contract</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress / Scanning State Box -->
+                <div id="analysisProgressBox" class="card progress-card hidden">
+                    <div class="progress-content">
+                        <div class="progress-spinner-ring" aria-hidden="true"></div>
+                        <h3 id="progressStepTitle">Extracting contract text...</h3>
+                        <p id="progressStepDesc">Segmenting document and preparing deterministic evidence IDs...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Review Workspace (Split View) -->
+            <section id="view-review" class="view-section">
+                <!-- Review Header Strip -->
+                <div class="review-header-bar">
+                    <div class="review-title-group">
+                        <a href="#history" class="btn-back" aria-label="Back to Analysis History">← History</a>
+                        <h1 id="reviewDocTitle" class="review-doc-title">Contract Review</h1>
+                        <span id="reviewDocTypeBadge" class="doc-type-badge">PDF</span>
+                    </div>
+                    <div class="review-actions-group">
+                        <button type="button" id="downloadPdfReportBtn" class="btn btn-secondary">
+                            <span aria-hidden="true">📥</span> Download PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Nemotron Banner -->
+                <div id="nemotronStatusBanner" class="info-banner" role="status">
+                    <span class="banner-icon" aria-hidden="true">ℹ️</span>
+                    <span id="nemotronBannerText" class="banner-text">Advanced interpretation was not used. Results are rule-based.</span>
+                </div>
+
+                <!-- Scanned PDF Alert Banner -->
+                <div id="scannedAlertBanner" class="alert-banner hidden" role="alert">
+                    <span class="alert-icon" aria-hidden="true">⚠️</span>
+                    <div class="alert-text">
+                        <strong>Scanned Document Detected:</strong>
+                        <span id="scannedAlertMessage">This PDF appears to be scanned images with no extractable text. OCR is required and is not enabled in this version.</span>
+                    </div>
+                </div>
+
+                <!-- Summary Strip -->
+                <div class="review-summary-strip">
+                    <div class="summary-pill pill-conflict">
+                        <span class="pill-icon" aria-hidden="true">⚠️</span>
+                        <span class="pill-count" id="summaryConflictsCount">0</span>
+                        <span class="pill-label">Potential Conflicts</span>
+                    </div>
+                    <div class="summary-pill pill-review">
+                        <span class="pill-icon" aria-hidden="true">🔎</span>
+                        <span class="pill-count" id="summaryReviewsCount">0</span>
+                        <span class="pill-label">Review Recommended</span>
+                    </div>
+                    <div class="summary-pill pill-ok">
+                        <span class="pill-icon" aria-hidden="true">✓</span>
+                        <span class="pill-count" id="summaryNoConflictsCount">0</span>
+                        <span class="pill-label">No Conflict Detected</span>
+                    </div>
+                    <div class="summary-policies-used">
+                        <span class="policies-used-label">Policies Evaluated:</span>
+                        <span id="summaryPoliciesList" class="policies-used-list">None</span>
+                    </div>
+                </div>
+
+                <!-- Mobile Switcher (Visible on narrow screens) -->
+                <div class="mobile-review-tabs" role="tablist">
+                    <button type="button" id="tabBtnDocument" class="mobile-tab-btn active" role="tab" aria-selected="true" aria-controls="reviewLeftPanel">Contract Text</button>
+                    <button type="button" id="tabBtnFindings" class="mobile-tab-btn" role="tab" aria-selected="false" aria-controls="reviewRightPanel">Findings (<span id="mobileFindingsBadge">0</span>)</button>
+                </div>
+
+                <!-- Split Screen Review Workspace -->
+                <div class="review-workspace">
+                    <!-- Left Panel: Extracted Segments in Document Order -->
+                    <div id="reviewLeftPanel" class="review-left-panel" role="region" aria-label="Extracted Contract Text">
+                        <div class="panel-header">
+                            <h2>Contract Text (Original Order)</h2>
+                            <span class="panel-note">Click a finding on the right to navigate to its exact evidence quote</span>
+                        </div>
+                        <div id="segmentsContainer" class="segments-container">
+                            <!-- Segments rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Right Panel: Findings List & Filter Bar -->
+                    <div id="reviewRightPanel" class="review-right-panel" role="region" aria-label="Policy Findings &amp; Next Steps">
+                        <div class="panel-header">
+                            <h2>Policy Findings</h2>
+                            <div class="findings-nav-controls">
+                                <button type="button" id="prevFindingBtn" class="btn-icon-nav" aria-label="Previous Finding" title="Previous Finding (Up Arrow)">▲</button>
+                                <span id="findingIndexIndicator" class="finding-nav-indicator">1 of 1</span>
+                                <button type="button" id="nextFindingBtn" class="btn-icon-nav" aria-label="Next Finding" title="Next Finding (Down Arrow)">▼</button>
+                            </div>
+                        </div>
+
+                        <!-- Filter Chips Bar -->
+                        <div class="filters-bar" role="toolbar" aria-label="Filter findings by category or status">
+                            <button type="button" class="filter-chip active" data-filter="all">All (<span id="cnt-all">0</span>)</button>
+                            <button type="button" class="filter-chip filter-chip-red" data-filter="conflicts">Conflicts (<span id="cnt-conflicts">0</span>)</button>
+                            <button type="button" class="filter-chip filter-chip-amber" data-filter="manual">Manual Review (<span id="cnt-manual">0</span>)</button>
+                            <button type="button" class="filter-chip" data-filter="payment">Payment (<span id="cnt-payment">0</span>)</button>
+                            <button type="button" class="filter-chip" data-filter="renewal">Renewal (<span id="cnt-renewal">0</span>)</button>
+                            <button type="button" class="filter-chip" data-filter="liability">Liability (<span id="cnt-liability">0</span>)</button>
+                            <button type="button" class="filter-chip" data-filter="jurisdiction">Jurisdiction (<span id="cnt-jurisdiction">0</span>)</button>
+                            <button type="button" class="filter-chip" data-filter="other">Other (<span id="cnt-other">0</span>)</button>
+                        </div>
+
+                        <!-- Findings List -->
+                        <div id="findingsContainer" class="findings-container" role="list">
+                            <!-- Finding cards dynamically rendered -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: My Policies -->
+            <section id="view-policies" class="view-section">
+                <div class="view-header">
+                    <div>
+                        <h1 class="view-title">My Policies</h1>
+                        <p class="view-subtitle">Define the exact rules and standards you want ClauseLens to check contracts against.</p>
+                    </div>
+                    <div class="view-header-actions">
+                        <button type="button" id="seedExamplePoliciesBtn" class="btn btn-secondary">
+                            <span aria-hidden="true">💡</span> Add Example Policies
+                        </button>
+                        <button type="button" id="openAddPolicyModalBtn" class="btn btn-primary">
+                            <span aria-hidden="true">➕</span> Add New Policy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div id="policiesListEmpty" class="empty-state hidden">
+                            <span class="empty-icon" aria-hidden="true">🛡️</span>
+                            <p class="empty-title">No policies configured yet</p>
+                            <p class="empty-desc">Click "Add Example Policies" to seed the recommended demo policies, or create your own custom policy.</p>
+                        </div>
+                        <div id="policiesListGrid" class="policies-grid">
+                            <!-- Policy Cards dynamically rendered -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: Analysis History -->
+            <section id="view-history" class="view-section">
+                <div class="view-header">
+                    <div>
+                        <h1 class="view-title">Analysis History</h1>
+                        <p class="view-subtitle">Reopen past analyses, download reports, or manage local data retention.</p>
+                    </div>
+                    <div class="view-header-actions">
+                        <button type="button" id="purgeRetentionBtn" class="btn btn-secondary" title="Purge records past 30 days">
+                            <span aria-hidden="true">🧹</span> Purge Expired
+                        </button>
+                        <button type="button" id="deleteAllHistoryBtn" class="btn btn-danger-outline" title="Delete all stored analyses">
+                            <span aria-hidden="true">🗑️</span> Delete All
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div id="historyEmptyState" class="empty-state">
+                            <span class="empty-icon" aria-hidden="true">🗂️</span>
+                            <p class="empty-title">History is empty</p>
+                            <p class="empty-desc">Analyses you run will be saved locally for review and report regeneration.</p>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="historyTable" class="data-table hidden" aria-label="Full Analysis History Table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Filename</th>
+                                        <th scope="col">Format</th>
+                                        <th scope="col">Date Analyzed</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Potential Conflicts</th>
+                                        <th scope="col">Review Recommended</th>
+                                        <th scope="col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: About and Privacy -->
+            <section id="view-about" class="view-section">
+                <div class="view-header">
+                    <h1 class="view-title">About &amp; Privacy Architecture</h1>
+                    <p class="view-subtitle">How ClauseLens protects your sensitive legal agreements.</p>
+                </div>
+
+                <div class="about-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Privacy &amp; Data Storage Guarantee</h2>
+                        </div>
+                        <div class="card-body about-prose">
+                            <p>ClauseLens is built from the ground up to keep your documents private and secure:</p>
+                            <ul>
+                                <li><strong>Local Storage Only:</strong> All database persistence uses SQLite on your local machine. No contracts are stored in any cloud service or remote repository.</li>
+                                <li><strong>Temporary Upload Files:</strong> Contract uploads are written to a private temporary directory with randomized filenames, parsed in memory, and immediately deleted in a guaranteed <code>finally</code> block.</li>
+                                <li><strong>Zero Cloud AI by Default:</strong> Core clause detection, segmentation, and policy matching are 100% deterministic and rule-based. No text leaves your machine unless you specifically opt-in to Nemotron.</li>
+                                <li><strong>Automatic Retention Purge:</strong> Analyses expire automatically after 30 days (<code>RETENTION_DAYS</code>) and are wiped on startup. You can also purge or delete records manually anytime.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Policy Assistance, Not Legal Advice</h2>
+                        </div>
+                        <div class="card-body about-prose">
+                            <div class="disclaimer-callout">
+                                <p><strong>Notice:</strong> ClauseLens provides policy-based assistance and is not legal advice. It checks only the supported clause types against the policies you configured. The absence of a flagged issue does not mean a contract is safe or complete. Consult a qualified professional before signing.</p>
+                            </div>
+                            <p>ClauseLens never declares a contract "safe", "legal", or "illegal". It only compares contract clauses against your configured rules and reports evidence-backed findings.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal: Policy Create/Edit -->
+    <div id="policyModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="policyModalTitle">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 id="policyModalTitle">Add New Policy</h2>
+                <button type="button" id="closePolicyModalBtn" class="btn-close" aria-label="Close dialog">✕</button>
+            </div>
+            <form id="policyForm" class="modal-form">
+                <input type="hidden" id="policyEditId" value="">
+
+                <div class="form-group">
+                    <label for="policyNameInput">Policy Name *</label>
+                    <input type="text" id="policyNameInput" required maxlength="120" placeholder="e.g. Maximum 30-Day Payment Term">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="policyTypeSelect">Clause Category *</label>
+                        <select id="policyTypeSelect" required>
+                            <option value="payment">Payment Terms</option>
+                            <option value="renewal">Renewal &amp; Extension</option>
+                            <option value="liability">Limitation of Liability</option>
+                            <option value="jurisdiction">Governing Law / Jurisdiction</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="policyModeSelect">Evaluation Mode *</label>
+                        <select id="policyModeSelect" required>
+                            <option value="structured">Structured (Deterministic)</option>
+                            <option value="free_text">Free Text (Requires Interpretation)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Dynamic Structured Parameter Fields -->
+                <div id="structuredParamsSection" class="structured-params-box">
+                    <!-- Payment params -->
+                    <div id="paramGroupPayment" class="param-group">
+                        <label for="paramMaxPaymentDays">Maximum Allowed Payment Days *</label>
+                        <input type="number" id="paramMaxPaymentDays" min="1" max="3650" value="30">
+                        <span class="field-help">Contracts with longer payment terms will trigger a potential conflict.</span>
+                    </div>
+
+                    <!-- Renewal params -->
+                    <div id="paramGroupRenewal" class="param-group hidden">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="paramAutoRenewalProhibited" checked>
+                            <span class="checkbox-custom"></span>
+                            <span>Prohibit Automatic Renewal (Evergreen clauses)</span>
+                        </label>
+                        <label for="paramMaxNoticeDays" class="mt-2">Maximum Cancellation Notice Period (Days)</label>
+                        <input type="number" id="paramMaxNoticeDays" min="1" max="365" value="30">
+                    </div>
+
+                    <!-- Liability params -->
+                    <div id="paramGroupLiability" class="param-group hidden">
+                        <label for="paramLiabilityRule">Liability Standard *</label>
+                        <select id="paramLiabilityRule">
+                            <option value="cap_not_exceed_fees">Cap Must Not Exceed Fees Paid (Fees-Paid Standard)</option>
+                            <option value="no_unlimited">No Unlimited Liability (Must Have A Stated Cap)</option>
+                        </select>
+                    </div>
+
+                    <!-- Jurisdiction params -->
+                    <div id="paramGroupJurisdiction" class="param-group hidden">
+                        <label for="paramApprovedJurisdictions">Approved Jurisdictions (comma-separated) *</label>
+                        <input type="text" id="paramApprovedJurisdictions" value="India, Indian law, Chennai, Bengaluru" placeholder="e.g. India, Chennai, Bengaluru, Delaware">
+                        <span class="field-help">Venues or governing laws not matching this list will be flagged.</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="policyExplanationInput">Policy Guideline / Rationale</label>
+                    <textarea id="policyExplanationInput" rows="2" placeholder="Brief natural language note explaining this requirement..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="policyEnabledInput" checked>
+                        <span class="checkbox-custom"></span>
+                        <span>Policy Enabled (evaluated during contract checks)</span>
+                    </label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" id="cancelPolicyBtn" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" id="savePolicyBtn" class="btn btn-primary">Save Policy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script (Vanilla JS, Zero Dependencies) -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

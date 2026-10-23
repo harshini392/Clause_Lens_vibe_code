@@ -1,0 +1,16 @@
+.env
+*.db
+*.sqlite3
+uploads/
+temp_uploads/
+reports/
+__pycache__/
+*/__pycache__/
+venv/
+.venv/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.zip
