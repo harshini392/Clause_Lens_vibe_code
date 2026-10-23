@@ -4,7 +4,7 @@ Implements the decision table for payment, renewal, liability, and jurisdiction,
 and informational evaluation for indemnification and termination.
 """
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import services.explanation_service as explanation_service
 
 
@@ -47,20 +47,232 @@ def matches_jurisdiction(named_items: List[str], approved_items: List[str]) -> b
                 return True
             if ("united states" in app or "usa" in app or "us" == app) and ("united states" in it or "delaware" in it or "new york" in it or "california" in it):
                 return True
-    return False
+import services.clause_detector as clause_detector
+
+
+def find_matching_segment(cues: List[str], segments: List[Dict[str, Any]]) -> Optional[Tuple[Dict[str, Any], int]]:
+    """Scan segments for the best matching cue occurrences. Returns (best_segment, match_score) or None."""
+    best_seg = None
+    best_score = 0
+    for seg in segments:
+        text_lower = seg.get("text", "").lower()
+        score = 0
+        for cue in cues:
+            cue_lower = cue.lower()
+            if cue_lower in text_lower:
+                score += 1
+        if score > best_score:
+            best_score = score
+            best_seg = seg
+    if best_score > 0 and best_seg:
+        return best_seg, best_score
+    return None
+
+
+def evaluate_domain_default_policy(
+    policy: Dict[str, Any],
+    all_segments: List[Dict[str, Any]],
+    segments_by_ev_id: Dict[str, Dict[str, Any]],
+    analysis_id: str,
+    clauses_by_category: Dict[str, List[Dict[str, Any]]]
+) -> Dict[str, Any]:
+    """Deterministically evaluate a domain-specific default policy profile check."""
+    rule_type = policy.get("rule_type", "required_clause")
+    req_level = policy.get("requirement_level", "recommended")
+    params = policy.get("params", {})
+    if isinstance(params, str):
+        try:
+            params = json.loads(params)
+        except Exception:
+            params = {}
+    cues = params.get("cues", [])
+    p_name = policy.get("name", "Policy Check")
+    p_cat = policy.get("category", "general")
+    source_name = policy.get("source_name", "Applicable Profile Standards")
+
+    policy_snapshot = {
+        "id": policy.get("id"),
+        "policy_key": policy.get("policy_key"),
+        "name": p_name,
+        "type": p_cat,
+        "category": p_cat,
+        "rule_type": rule_type,
+        "source": policy.get("source", "domain_default"),
+        "requirement_level": req_level,
+        "source_name": source_name,
+        "source_url": policy.get("source_url", ""),
+        "source_version": policy.get("source_version", ""),
+        "mode": policy.get("mode", "structured"),
+        "params": params,
+        "explanation": policy.get("explanation", "")
+    }
+    policy_snapshot_json = json.dumps(policy_snapshot)
+
+    # 1. MINIMUM VALUE RULE (e.g. bid validity >= 90 days)
+    if rule_type == "minimum_value":
+        min_val = int(params.get("min_value", 0))
+        match_result = find_matching_segment(cues, all_segments)
+        if match_result:
+            seg, _ = match_result
+            ev_id = seg.get("evidence_id")
+            quote = seg.get("text", "")
+            loc_label = get_location_label(seg)
+            parsed_days, _ = clause_detector.parse_duration_in_days(quote)
+
+            if parsed_days is not None:
+                if parsed_days >= min_val:
+                    status = "no_conflict_detected"
+                    manual_rev = 0
+                    title = f"Validity period satisfies minimum requirement ({parsed_days} days >= {min_val} days)"
+                    explanation = f"The stated validity period of {parsed_days} days meets or exceeds the required minimum of {min_val} days ({source_name})."
+                    next_step = "No action required."
+                else:
+                    status = "potential_conflict"
+                    manual_rev = 1
+                    title = f"Validity period below required minimum ({parsed_days} days < {min_val} days)"
+                    explanation = f"The stated validity period of {parsed_days} days is less than the prescribed minimum of {min_val} days ({source_name})."
+                    next_step = f"Request extension of validity to at least {min_val} days."
+                details = {"stated_days": parsed_days, "min_days": min_val, "rule_type": "minimum_value"}
+            else:
+                status = "review_recommended"
+                manual_rev = 1
+                title = f"Validity term requires manual review: {p_name}"
+                explanation = f"A validity provision was identified in {loc_label}, but the exact numerical duration could not be deterministically extracted."
+                next_step = f"Inspect the clause to confirm that the validity period satisfies the {min_val}-day threshold."
+                details = {"reason": "ambiguous_duration", "min_days": min_val, "rule_type": "minimum_value"}
+        else:
+            status = "potential_conflict" if req_level == "mandatory" else "review_recommended"
+            manual_rev = 1 if req_level == "recommended" else 0
+            ev_id = "doc_wide"
+            loc_label = "Document-wide"
+            quote = f"No clause specifying {p_name.lower()} was identified in the document."
+            title = f"Missing required term: {p_name}"
+            explanation = f"The document does not contain an identifiable clause specifying the minimum {min_val}-day validity requirement ({source_name})."
+            next_step = f"Ensure the document specifies a bid validity period of at least {min_val} days."
+            details = {"reason": "clause_missing", "min_days": min_val, "rule_type": "minimum_value"}
+
+        return {
+            "analysis_id": analysis_id,
+            "policy_id": None,
+            "policy_snapshot_json": policy_snapshot_json,
+            "category": p_cat,
+            "status": status,
+            "title": title,
+            "explanation": explanation,
+            "quote": quote,
+            "evidence_id": ev_id,
+            "location_label": loc_label,
+            "next_step": next_step,
+            "manual_review": manual_rev,
+            "details_json": json.dumps(details)
+        }
+
+    # 2. REQUIRED INFORMATION / REQUIRED CLAUSE RULE
+    elif rule_type in ("required_clause", "required_information"):
+        match_result = find_matching_segment(cues, all_segments)
+        cat_clauses = clauses_by_category.get(p_cat, [])
+        if not match_result and cat_clauses:
+            cl = cat_clauses[0]
+            seg = segments_by_ev_id.get(cl["evidence_id"])
+            if seg:
+                match_result = (seg, 1)
+
+        if match_result:
+            seg, _ = match_result
+            ev_id = seg.get("evidence_id")
+            quote = seg.get("text", "")
+            loc_label = get_location_label(seg)
+            status = "no_conflict_detected"
+            manual_rev = 0
+            title = f"Required provision identified: {p_name}"
+            explanation = f"The required {p_name.lower()} provision was identified in {loc_label}. Verified against source: {source_name}."
+            next_step = "Verify that specific terms match transaction expectations."
+            details = {"rule_type": rule_type, "requirement_level": req_level, "found": True}
+        else:
+            status = "potential_conflict" if req_level == "mandatory" else "review_recommended"
+            manual_rev = 1 if req_level == "recommended" else 0
+            ev_id = "doc_wide"
+            loc_label = "Document-wide"
+            quote = f"No required {p_name.lower()} clause was identified in the document."
+            title = f"Missing required clause: {p_name}"
+            explanation = f"The document does not contain an identifiable {p_name.lower()} clause as prescribed by {source_name}."
+            next_step = "Incorporate the required provision or verify with the issuing counterparty."
+            details = {"rule_type": rule_type, "requirement_level": req_level, "reason": "clause_missing"}
+
+        return {
+            "analysis_id": analysis_id,
+            "policy_id": None,
+            "policy_snapshot_json": policy_snapshot_json,
+            "category": p_cat,
+            "status": status,
+            "title": title,
+            "explanation": explanation,
+            "quote": quote,
+            "evidence_id": ev_id,
+            "location_label": loc_label,
+            "next_step": next_step,
+            "manual_review": manual_rev,
+            "details_json": json.dumps(details)
+        }
+
+    # 3. MANUAL REVIEW / RECOMMENDED CHECK
+    else:
+        match_result = find_matching_segment(cues, all_segments)
+        cat_clauses = clauses_by_category.get(p_cat, [])
+        if not match_result and cat_clauses:
+            cl = cat_clauses[0]
+            seg = segments_by_ev_id.get(cl["evidence_id"])
+            if seg:
+                match_result = (seg, 1)
+
+        if match_result:
+            seg, _ = match_result
+            ev_id = seg.get("evidence_id")
+            quote = seg.get("text", "")
+            loc_label = get_location_label(seg)
+            title = f"Review recommended: {p_name}"
+            explanation = f"A relevant clause was identified in {loc_label}. Review against guidelines ({source_name}): {policy.get('explanation', '')}"
+            next_step = "Review the excerpt with operational or legal advisors to confirm compliance."
+            details = {"rule_type": rule_type, "requirement_level": req_level, "located": True}
+        else:
+            ev_id = "doc_wide"
+            loc_label = "Document-wide"
+            quote = f"No explicit clause addressing {p_name.lower()} was identified in the document."
+            title = f"Review recommended (Clause not located): {p_name}"
+            explanation = f"No explicit clause addressing {p_name.lower()} was found in the text. Reference: {source_name}."
+            next_step = "Consider whether to include standard terms for this item."
+            details = {"rule_type": rule_type, "requirement_level": req_level, "located": False}
+
+        return {
+            "analysis_id": analysis_id,
+            "policy_id": None,
+            "policy_snapshot_json": policy_snapshot_json,
+            "category": p_cat,
+            "status": "review_recommended",
+            "title": title,
+            "explanation": explanation,
+            "quote": quote,
+            "evidence_id": ev_id,
+            "location_label": loc_label,
+            "next_step": next_step,
+            "manual_review": 1,
+            "details_json": json.dumps(details)
+        }
 
 
 def evaluate_rules(
     detected_clauses: List[Dict[str, Any]],
     active_policies: List[Dict[str, Any]],
     segments_by_ev_id: Dict[str, Dict[str, Any]],
-    analysis_id: str
+    analysis_id: str,
+    segments: Optional[List[Dict[str, Any]]] = None
 ) -> List[Dict[str, Any]]:
     """Evaluate detected clauses against active policies according to deterministic rules.
     Disabled policies are never passed or evaluated.
     Returns list of findings.
     """
     findings: List[Dict[str, Any]] = []
+    all_segments = segments if segments is not None else list(segments_by_ev_id.values())
 
     # Group detected clauses by category
     clauses_by_category: Dict[str, List[Dict[str, Any]]] = {}
@@ -72,6 +284,14 @@ def evaluate_rules(
     for policy in active_policies:
         # Guarantee disabled policies are skipped
         if not policy.get("enabled", 1):
+            continue
+
+        # Check if this is a domain default policy
+        if policy.get("source") == "domain_default":
+            finding = evaluate_domain_default_policy(
+                policy, all_segments, segments_by_ev_id, analysis_id, clauses_by_category
+            )
+            findings.append(finding)
             continue
 
         p_id = policy.get("id")
@@ -86,7 +306,9 @@ def evaluate_rules(
             "type": p_type,
             "mode": p_mode,
             "params": params,
-            "explanation": policy.get("explanation", "")
+            "explanation": policy.get("explanation", ""),
+            "source": policy.get("source", "user"),
+            "requirement_level": policy.get("requirement_level", "mandatory")
         }
         policy_snapshot_json = json.dumps(policy_snapshot)
 
@@ -417,8 +639,11 @@ def evaluate_rules(
                         "details_json": json.dumps(details)
                     })
 
-    # 2. Informational checks (indemnification and termination - no user policy exists)
+    # 2. Informational checks (indemnification and termination - only if not already evaluated by an active policy)
+    evaluated_categories = {p.get("category") for p in active_policies if p.get("enabled", 1)}
     for cat in ["indemnification", "termination"]:
+        if cat in evaluated_categories:
+            continue
         info_clauses = clauses_by_category.get(cat, [])
         for cl in info_clauses:
             facts = cl.get("facts", {})

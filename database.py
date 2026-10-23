@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import config
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def get_db(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -16,6 +16,119 @@ def get_db(db_path: Optional[str] = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Safely apply backward-compatible schema migrations."""
+    cur = conn.cursor()
+
+    # 1. Safely add domain-specific columns to analyses table if missing
+    cur.execute("PRAGMA table_info(analyses);")
+    existing_analyses_cols = {r["name"] for r in cur.fetchall()}
+    analyses_new_cols = [
+        ("domain", "TEXT"),
+        ("document_type", "TEXT"),
+        ("jurisdiction", "TEXT"),
+        ("issuing_authority", "TEXT")
+    ]
+    for col_name, col_type in analyses_new_cols:
+        if col_name not in existing_analyses_cols:
+            conn.execute(f"ALTER TABLE analyses ADD COLUMN {col_name} {col_type};")
+
+    # 2. Check clauses table constraint
+    cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='clauses';")
+    clause_row = cur.fetchone()
+    if clause_row and "CHECK(category IN" in clause_row["sql"]:
+        # Migrate clauses table to allow extensible domain categories
+        conn.execute("PRAGMA foreign_keys = OFF;")
+        conn.execute("ALTER TABLE clauses RENAME TO clauses_old;")
+        conn.execute("""
+            CREATE TABLE clauses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                analysis_id TEXT NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
+                evidence_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                facts_json TEXT NOT NULL,
+                confidence TEXT NOT NULL CHECK(confidence IN ('high', 'medium', 'low')),
+                source TEXT NOT NULL CHECK(source IN ('rule', 'nemotron')),
+                review_status TEXT NOT NULL DEFAULT 'unreviewed'
+            );
+        """)
+        conn.execute("""
+            INSERT INTO clauses (id, analysis_id, evidence_id, category, facts_json, confidence, source, review_status)
+            SELECT id, analysis_id, evidence_id, category, facts_json, confidence, source, review_status
+            FROM clauses_old;
+        """)
+        conn.execute("DROP TABLE clauses_old;")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_clauses_analysis ON clauses(analysis_id);")
+        conn.execute("PRAGMA foreign_keys = ON;")
+
+    # 3. Create default_policies table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS default_policies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            policy_key TEXT UNIQUE NOT NULL,
+            domain TEXT NOT NULL,
+            document_type TEXT NOT NULL,
+            jurisdiction TEXT NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            category TEXT NOT NULL,
+            rule_type TEXT NOT NULL,
+            parameters_json TEXT NOT NULL DEFAULT '{}',
+            enabled_by_default INTEGER NOT NULL DEFAULT 1,
+            requirement_level TEXT NOT NULL CHECK(requirement_level IN ('mandatory', 'recommended')),
+            source_name TEXT NOT NULL DEFAULT '',
+            source_url TEXT NOT NULL DEFAULT '',
+            source_version TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_default_policies_domain_type ON default_policies(domain, document_type);")
+
+    # Update schema version record
+    cur.execute("UPDATE schema_version SET version = ?;", (SCHEMA_VERSION,))
+
+
+def sync_default_policies_table(conn: sqlite3.Connection) -> int:
+    """Synchronize default policies table from the default policy service catalog."""
+    import services.default_policy_service as dps
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) as cnt FROM default_policies;")
+    existing_cnt = cur.fetchone()["cnt"]
+
+    if existing_cnt == 0:
+        for p in dps.DEFAULT_POLICY_CATALOG:
+            doc_types = p.get("document_types", ["*"])
+            doc_type_str = ",".join(doc_types)
+            cur.execute("""
+                INSERT OR IGNORE INTO default_policies (
+                    policy_key, domain, document_type, jurisdiction, name, description,
+                    category, rule_type, parameters_json, enabled_by_default,
+                    requirement_level, source_name, source_url, source_version,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, (
+                p["policy_key"],
+                p["domain"],
+                doc_type_str,
+                p.get("jurisdiction", "Any"),
+                p["name"],
+                p["description"],
+                p["category"],
+                p["rule_type"],
+                json.dumps(p.get("parameters", {})),
+                1 if p.get("enabled_by_default", True) else 0,
+                p.get("requirement_level", "recommended"),
+                p.get("source_name", ""),
+                p.get("source_url", ""),
+                p.get("source_version", ""),
+                p.get("created_at", datetime.now(timezone.utc).isoformat()),
+                p.get("updated_at", datetime.now(timezone.utc).isoformat())
+            ))
+        return len(dps.DEFAULT_POLICY_CATALOG)
+    return 0
 
 
 def init_db(db_path: Optional[str] = None) -> None:
@@ -62,7 +175,11 @@ def init_db(db_path: Optional[str] = None) -> None:
                     nemotron_note TEXT,
                     policies_snapshot_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
-                    expires_at TEXT NOT NULL
+                    expires_at TEXT NOT NULL,
+                    domain TEXT,
+                    document_type TEXT,
+                    jurisdiction TEXT,
+                    issuing_authority TEXT
                 );
             """)
 
@@ -85,7 +202,7 @@ def init_db(db_path: Optional[str] = None) -> None:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     analysis_id TEXT NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,
                     evidence_id TEXT NOT NULL,
-                    category TEXT NOT NULL CHECK(category IN ('payment', 'renewal', 'liability', 'indemnification', 'jurisdiction', 'termination')),
+                    category TEXT NOT NULL,
                     facts_json TEXT NOT NULL,
                     confidence TEXT NOT NULL CHECK(confidence IN ('high', 'medium', 'low')),
                     source TEXT NOT NULL CHECK(source IN ('rule', 'nemotron')),
@@ -118,6 +235,12 @@ def init_db(db_path: Optional[str] = None) -> None:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_clauses_analysis ON clauses(analysis_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_findings_analysis ON findings(analysis_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_analyses_expires ON analyses(expires_at);")
+
+            # Apply migrations to existing databases
+            _migrate_schema(conn)
+
+            # Sync default policy catalog table
+            sync_default_policies_table(conn)
 
         # Auto-purge expired records on startup
         purge_expired_analyses(conn)

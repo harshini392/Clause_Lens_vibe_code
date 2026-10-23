@@ -24,6 +24,7 @@ import services.clause_detector as clause_detector
 import services.rule_engine as rule_engine
 import services.report_service as report_service
 import services.nemotron_service as nemotron_service
+import services.default_policy_service as default_policy_service
 
 # Logging setup: log system events only, NEVER document text
 logging.basicConfig(
@@ -374,11 +375,54 @@ def seed_policies():
     return jsonify({"seeded": True, "count": count})
 
 
+# --- Domain and Profile Discovery APIs ---
+
+@app.route("/api/domains", methods=["GET"])
+def get_domains():
+    """Return supported document domains and dependent document types."""
+    return jsonify({
+        "domains": default_policy_service.get_supported_domains(),
+        "authority_domains": default_policy_service.AUTHORITY_DOMAINS
+    })
+
+
+@app.route("/api/default-policies", methods=["GET"])
+def get_default_policies():
+    """Return default policy profile checks for the specified domain and document type."""
+    domain = request.args.get("domain", "").strip()
+    document_type = request.args.get("document_type", "").strip()
+    jurisdiction = request.args.get("jurisdiction", "India").strip() or "India"
+
+    if not domain or not document_type:
+        return jsonify({
+            "error": {
+                "code": "missing_parameters",
+                "message": "Both 'domain' and 'document_type' query parameters are required."
+            }
+        }), 400
+
+    if not default_policy_service.is_valid_domain_and_doc_type(domain, document_type):
+        return jsonify({
+            "error": {
+                "code": "invalid_domain_configuration",
+                "message": f"Unsupported document domain '{domain}' or document type '{document_type}'."
+            }
+        }), 422
+
+    policies = default_policy_service.get_default_policies_for_profile(domain, document_type, jurisdiction)
+    return jsonify({
+        "domain": domain,
+        "document_type": document_type,
+        "jurisdiction": jurisdiction,
+        "policies": policies
+    })
+
+
 # --- Contract Analysis Endpoint ---
 
 @app.route("/api/analyze", methods=["POST"])
 def analyze_contract():
-    """Upload and analyze a contract file against user policies."""
+    """Upload and analyze a contract file against default profile policies and user policies."""
     if "file" not in request.files:
         return jsonify({"error": {"code": "missing_file", "message": "No file part in upload request."}}), 400
 
@@ -396,6 +440,40 @@ def analyze_contract():
         file_type = document_reader.validate_file_bytes(file_bytes, raw_filename)
     except document_reader.DocumentReaderError as de:
         return jsonify({"error": {"code": de.code, "message": de.message}}), de.status_code
+
+    # Read and validate domain configuration
+    raw_domain = request.form.get("domain", "").strip()
+    raw_doc_type = request.form.get("document_type", "").strip()
+    jurisdiction = request.form.get("jurisdiction", "India").strip() or "India"
+    issuing_authority = request.form.get("issuing_authority", "").strip()
+    deselected_keys_str = request.form.get("deselected_default_keys", "").strip()
+
+    deselected_keys = []
+    if deselected_keys_str:
+        try:
+            if deselected_keys_str.startswith("["):
+                deselected_keys = json.loads(deselected_keys_str)
+            else:
+                deselected_keys = [k.strip() for k in deselected_keys_str.split(",") if k.strip()]
+        except Exception:
+            deselected_keys = [k.strip() for k in deselected_keys_str.split(",") if k.strip()]
+
+    # If domain/document_type are provided, validate strictly; if omitted (legacy test calls), evaluate user policies only
+    if raw_domain or raw_doc_type:
+        if not default_policy_service.is_valid_domain_and_doc_type(raw_domain, raw_doc_type):
+            return jsonify({
+                "error": {
+                    "code": "invalid_domain_configuration",
+                    "message": f"Unsupported document domain '{raw_domain}' or document type '{raw_doc_type}'. Please select a valid profile."
+                }
+            }), 422
+        domain = raw_domain
+        document_type = raw_doc_type
+        has_domain_profile = True
+    else:
+        domain = "General Contracts"
+        document_type = "Custom Policy Evaluation"
+        has_domain_profile = False
 
     # Validate requested policy IDs if provided
     selected_policy_ids_str = request.form.get("policy_ids")
@@ -434,6 +512,19 @@ def analyze_contract():
 
     use_nemotron_opt_in = request.form.get("use_nemotron", "false").lower() in ("true", "1", "yes")
 
+    # Merge default policies and user policies
+    if has_domain_profile:
+        merged_policies = default_policy_service.merge_policies(
+            domain=domain,
+            document_type=document_type,
+            jurisdiction=jurisdiction,
+            issuing_authority=issuing_authority,
+            user_policies=active_policies,
+            deselected_default_keys=deselected_keys
+        )
+    else:
+        merged_policies = list(active_policies)
+
     # Secure temporary storage
     display_name = document_reader.sanitize_filename(raw_filename)
     temp_filename = f"{uuid.uuid4().hex}.{file_type}"
@@ -465,12 +556,21 @@ def analyze_contract():
                         INSERT INTO analyses (
                             id, filename, file_type, page_count_or_paragraph_count, text_length,
                             extraction_status, nemotron_used, nemotron_note, policies_snapshot_json,
-                            created_at, expires_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                            created_at, expires_at, domain, document_type, jurisdiction, issuing_authority
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """, (
                         analysis_id, display_name, file_type, count, 0,
                         "scanned_no_text", 0, "OCR is required and not enabled.",
-                        json.dumps([]), now_iso, expires_at_iso
+                        json.dumps({
+                            "domain": domain,
+                            "document_type": document_type,
+                            "jurisdiction": jurisdiction,
+                            "issuing_authority": issuing_authority,
+                            "profile_version": default_policy_service.PROFILE_VERSION,
+                            "policies": []
+                        }),
+                        now_iso, expires_at_iso,
+                        domain, document_type, jurisdiction, issuing_authority
                     ))
             finally:
                 conn.close()
@@ -484,6 +584,12 @@ def analyze_contract():
                     "message": scanned_msg,
                     "page_count_or_paragraph_count": count,
                     "text_length": 0
+                },
+                "profile": {
+                    "domain": domain,
+                    "document_type": document_type,
+                    "jurisdiction": jurisdiction,
+                    "issuing_authority": issuing_authority
                 },
                 "nemotron": {
                     "requested": use_nemotron_opt_in,
@@ -533,13 +639,22 @@ def analyze_contract():
             else:
                 nemotron_note = "Nemotron service is not configured or disabled in environment."
 
-        # Evaluate deterministic rules against active policies
+        # Evaluate deterministic rules against merged policies
         findings = rule_engine.evaluate_rules(
-            detected_clauses, active_policies, segments_by_ev_id, analysis_id
+            detected_clauses, merged_policies, segments_by_ev_id, analysis_id, segments=segments
         )
 
         # Persist everything atomically to SQLite
-        policies_snapshot_json = json.dumps(active_policies)
+        policies_snapshot_payload = {
+            "domain": domain,
+            "document_type": document_type,
+            "jurisdiction": jurisdiction,
+            "issuing_authority": issuing_authority,
+            "profile_version": default_policy_service.PROFILE_VERSION,
+            "policies": merged_policies
+        }
+        policies_snapshot_json = json.dumps(policies_snapshot_payload)
+
         conn = database.get_db()
         try:
             with conn:
@@ -549,12 +664,13 @@ def analyze_contract():
                     INSERT INTO analyses (
                         id, filename, file_type, page_count_or_paragraph_count, text_length,
                         extraction_status, nemotron_used, nemotron_note, policies_snapshot_json,
-                        created_at, expires_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                        created_at, expires_at, domain, document_type, jurisdiction, issuing_authority
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """, (
                     analysis_id, display_name, file_type, count, text_length,
                     extraction_status, 1 if nemotron_used else 0, nemotron_note,
-                    policies_snapshot_json, now_iso, expires_at_iso
+                    policies_snapshot_json, now_iso, expires_at_iso,
+                    domain, document_type, jurisdiction, issuing_authority
                 ))
 
                 # 2. Insert segments
@@ -597,8 +713,8 @@ def analyze_contract():
         reviews = sum(1 for f in findings if f["status"] == "review_recommended")
         no_conflicts = sum(1 for f in findings if f["status"] == "no_conflict_detected")
 
-        logger.info("Analysis completed for %s [ID: %s]: %d conflicts, %d reviews, %d no conflicts.",
-                    display_name, analysis_id, conflicts, reviews, no_conflicts)
+        logger.info("Analysis completed for %s [ID: %s, Domain: %s, DocType: %s]: %d conflicts, %d reviews, %d no conflicts.",
+                    display_name, analysis_id, domain, document_type, conflicts, reviews, no_conflicts)
 
         return jsonify({
             "analysis_id": analysis_id,
@@ -608,6 +724,12 @@ def analyze_contract():
                 "extraction_status": extraction_status,
                 "page_count_or_paragraph_count": count,
                 "text_length": text_length
+            },
+            "profile": {
+                "domain": domain,
+                "document_type": document_type,
+                "jurisdiction": jurisdiction,
+                "issuing_authority": issuing_authority
             },
             "nemotron": {
                 "requested": use_nemotron_opt_in,
@@ -665,6 +787,10 @@ def get_history():
                 "id": r["id"],
                 "filename": r["filename"],
                 "file_type": r["file_type"],
+                "domain": r["domain"],
+                "document_type": r["document_type"],
+                "jurisdiction": r["jurisdiction"],
+                "issuing_authority": r["issuing_authority"],
                 "page_count_or_paragraph_count": r["page_count_or_paragraph_count"],
                 "text_length": r["text_length"],
                 "extraction_status": r["extraction_status"],
@@ -695,7 +821,15 @@ def get_analysis_details(analysis_id: str):
 
         analysis = dict(analysis_row)
         try:
-            analysis["policies_snapshot"] = json.loads(analysis.get("policies_snapshot_json", "[]"))
+            raw_snap = json.loads(analysis.get("policies_snapshot_json", "[]"))
+            if isinstance(raw_snap, dict) and "policies" in raw_snap:
+                analysis["policies_snapshot"] = raw_snap["policies"]
+                analysis["domain"] = analysis.get("domain") or raw_snap.get("domain")
+                analysis["document_type"] = analysis.get("document_type") or raw_snap.get("document_type")
+                analysis["jurisdiction"] = analysis.get("jurisdiction") or raw_snap.get("jurisdiction")
+                analysis["issuing_authority"] = analysis.get("issuing_authority") or raw_snap.get("issuing_authority")
+            else:
+                analysis["policies_snapshot"] = raw_snap
         except Exception:
             analysis["policies_snapshot"] = []
 
@@ -817,7 +951,15 @@ def download_pdf_report(analysis_id: str):
 
         analysis = dict(analysis_row)
         try:
-            policies = json.loads(analysis.get("policies_snapshot_json", "[]"))
+            raw_snap = json.loads(analysis.get("policies_snapshot_json", "[]"))
+            if isinstance(raw_snap, dict) and "policies" in raw_snap:
+                policies = raw_snap["policies"]
+                analysis["domain"] = analysis.get("domain") or raw_snap.get("domain")
+                analysis["document_type"] = analysis.get("document_type") or raw_snap.get("document_type")
+                analysis["jurisdiction"] = analysis.get("jurisdiction") or raw_snap.get("jurisdiction")
+                analysis["issuing_authority"] = analysis.get("issuing_authority") or raw_snap.get("issuing_authority")
+            else:
+                policies = raw_snap
         except Exception:
             policies = []
 

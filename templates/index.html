@@ -187,15 +187,93 @@
                         </div>
                     </div>
 
-                    <div class="card policy-select-card">
+                    <div class="card domain-select-card">
                         <div class="card-header">
-                            <h2>2. Active Policies to Check</h2>
-                            <button type="button" id="toggleAllPoliciesBtn" class="btn-text-action">Select All</button>
+                            <h2>2. Document Domain &amp; Classification</h2>
                         </div>
                         <div class="card-body">
-                            <p class="section-help-text">Choose which of your policies should be evaluated against this contract:</p>
-                            <div id="policyChecklist" class="policy-checklist" role="group" aria-label="Policy Selection List">
-                                <!-- Dynamically populated -->
+                            <p class="section-help-text">Select the document domain and classification to automatically load statutory requirements and recommended review checks:</p>
+                            <div class="domain-form-grid">
+                                <div class="form-group">
+                                    <label for="domainSelect" class="form-label">
+                                        Document Domain <span class="required-indicator">*</span>
+                                    </label>
+                                    <select id="domainSelect" class="form-select" required aria-required="true">
+                                        <option value="">-- Select Document Domain --</option>
+                                        <option value="Government Documents">Government Documents</option>
+                                        <option value="Government Tenders and Procurement">Government Tenders and Procurement</option>
+                                        <option value="Employment Documents">Employment Documents</option>
+                                        <option value="Service and Freelancer Agreements">Service and Freelancer Agreements</option>
+                                        <option value="Non-Disclosure Agreements (NDA)">Non-Disclosure Agreements (NDA)</option>
+                                        <option value="Lease and Rental Agreements">Lease and Rental Agreements</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="docTypeSelect" class="form-label">
+                                        Document Type <span class="required-indicator">*</span>
+                                    </label>
+                                    <select id="docTypeSelect" class="form-select" required aria-required="true" disabled>
+                                        <option value="">-- Select Domain First --</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="jurisdictionInput" class="form-label">
+                                        Jurisdiction (Optional)
+                                    </label>
+                                    <input type="text" id="jurisdictionInput" class="form-input" value="India" placeholder="e.g. India, United States, UK" maxlength="100">
+                                </div>
+
+                                <div id="issuingAuthorityGroup" class="form-group hidden">
+                                    <label for="issuingAuthorityInput" class="form-label">
+                                        Issuing Authority (Optional)
+                                    </label>
+                                    <input type="text" id="issuingAuthorityInput" class="form-input" placeholder="e.g. Ministry of Finance, CPWD, Municipal Authority" maxlength="150">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card policy-select-card">
+                        <div class="card-header">
+                            <h2>3. Policies to Evaluate</h2>
+                        </div>
+                        <div class="card-body">
+                            <!-- Section A: Default Profile Policies -->
+                            <div class="policy-profile-section">
+                                <div class="policy-section-header">
+                                    <div class="policy-section-title-group">
+                                        <h3 class="policy-subheading">Default Policies for This Document</h3>
+                                        <span id="defaultProfileBadge" class="profile-info-pill">Select Domain &amp; Type</span>
+                                    </div>
+                                    <button type="button" id="toggleDefaultPoliciesBtn" class="btn-text-action">Deselect All Defaults</button>
+                                </div>
+                                <p class="policy-section-desc">
+                                    Curated checks loaded from official statutory frameworks and best-practice review standards. You may deselect optional checks for this analysis without altering the master library.
+                                </p>
+                                <div id="defaultPolicyChecklist" class="policy-checklist" role="group" aria-label="Default Profile Policies">
+                                    <p class="empty-desc">Select a Document Domain and Document Type above to load the applicable default policy profile.</p>
+                                </div>
+                            </div>
+
+                            <hr class="section-divider">
+
+                            <!-- Section B: My Custom Policies -->
+                            <div class="policy-profile-section">
+                                <div class="policy-section-header">
+                                    <div class="policy-section-title-group">
+                                        <h3 class="policy-subheading">My Policies</h3>
+                                        <span class="profile-info-pill profile-info-blue">Organization Rules</span>
+                                    </div>
+                                    <button type="button" id="toggleAllPoliciesBtn" class="btn-text-action">Select All</button>
+                                </div>
+                                <p class="policy-section-desc">
+                                    Your enabled organization policies to evaluate alongside the default profile checks:
+                                </p>
+                                <div id="policyChecklist" class="policy-checklist" role="group" aria-label="User Policy Selection List">
+                                    <!-- Dynamically populated from user's policies -->
+                                </div>
                             </div>
 
                             <div class="nemotron-optin-box">
@@ -237,6 +315,7 @@
                         <a href="#history" class="btn-back" aria-label="Back to Analysis History">← History</a>
                         <h1 id="reviewDocTitle" class="review-doc-title">Contract Review</h1>
                         <span id="reviewDocTypeBadge" class="doc-type-badge">PDF</span>
+                        <span id="reviewDomainBadge" class="doc-domain-badge hidden"></span>
                     </div>
                     <div class="review-actions-group">
                         <button type="button" id="downloadPdfReportBtn" class="btn btn-secondary">
@@ -262,6 +341,11 @@
 
                 <!-- Summary Strip -->
                 <div class="review-summary-strip">
+                    <div class="summary-pill pill-domain">
+                        <span class="pill-icon" aria-hidden="true">🏛️</span>
+                        <span class="pill-label">Profile:</span>
+                        <span id="summaryDomainProfile" class="pill-value-strong">General</span>
+                    </div>
                     <div class="summary-pill pill-conflict">
                         <span class="pill-icon" aria-hidden="true">⚠️</span>
                         <span class="pill-count" id="summaryConflictsCount">0</span>
@@ -393,6 +477,7 @@
                                 <thead>
                                     <tr>
                                         <th scope="col">Filename</th>
+                                        <th scope="col">Domain / Type</th>
                                         <th scope="col">Format</th>
                                         <th scope="col">Date Analyzed</th>
                                         <th scope="col">Status</th>

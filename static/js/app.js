@@ -45,6 +45,17 @@
         selectedFileName: document.getElementById("selectedFileName"),
         selectedFileSize: document.getElementById("selectedFileSize"),
         removeFileBtn: document.getElementById("removeFileBtn"),
+
+        // Domain & Classification
+        domainSelect: document.getElementById("domainSelect"),
+        docTypeSelect: document.getElementById("docTypeSelect"),
+        jurisdictionInput: document.getElementById("jurisdictionInput"),
+        issuingAuthorityGroup: document.getElementById("issuingAuthorityGroup"),
+        issuingAuthorityInput: document.getElementById("issuingAuthorityInput"),
+        defaultProfileBadge: document.getElementById("defaultProfileBadge"),
+        toggleDefaultPoliciesBtn: document.getElementById("toggleDefaultPoliciesBtn"),
+        defaultPolicyChecklist: document.getElementById("defaultPolicyChecklist"),
+
         policyChecklist: document.getElementById("policyChecklist"),
         toggleAllPoliciesBtn: document.getElementById("toggleAllPoliciesBtn"),
         nemotronOptIn: document.getElementById("nemotronOptIn"),
@@ -56,6 +67,8 @@
         // Review Workspace
         reviewDocTitle: document.getElementById("reviewDocTitle"),
         reviewDocTypeBadge: document.getElementById("reviewDocTypeBadge"),
+        reviewDomainBadge: document.getElementById("reviewDomainBadge"),
+        summaryDomainProfile: document.getElementById("summaryDomainProfile"),
         downloadPdfReportBtn: document.getElementById("downloadPdfReportBtn"),
         nemotronStatusBanner: document.getElementById("nemotronStatusBanner"),
         nemotronBannerText: document.getElementById("nemotronBannerText"),
@@ -287,15 +300,234 @@
 
     // --- New Analysis View ---
 
+    // --- New Analysis View ---
+
+    async function loadDomainsAndProfiles() {
+        if (!state.domains) {
+            try {
+                const data = await apiFetch("/api/domains");
+                state.domains = data.domains;
+                state.authorityDomains = data.authority_domains || [];
+            } catch (err) {
+                console.warn("Could not fetch domain definitions from API, using defaults:", err);
+                state.domains = {
+                    "Government Documents": [
+                        "Government Application Form", "Government Notice or Instructions", "Government Policy or Regulation", "Government Declaration", "Other Government Document"
+                    ],
+                    "Government Tenders and Procurement": [
+                        "Tender / Request for Proposal", "Bid Document", "Procurement Contract", "Other Procurement Document"
+                    ],
+                    "Employment Documents": [
+                        "Employment Offer Letter", "Employment Agreement", "Other Employment Document"
+                    ],
+                    "Service and Freelancer Agreements": [
+                        "Freelance Agreement", "Service Agreement", "Consulting Agreement", "Other Service Document"
+                    ],
+                    "Non-Disclosure Agreements (NDA)": [
+                        "One-Way NDA", "Mutual NDA", "Other Confidentiality Document"
+                    ],
+                    "Lease and Rental Agreements": [
+                        "Residential Rental Agreement", "Commercial Lease", "Leave-and-License Agreement", "Other Property Document"
+                    ]
+                };
+                state.authorityDomains = ["Government Documents", "Government Tenders and Procurement"];
+            }
+        }
+    }
+
     async function prepareNewAnalysisView() {
-        // Load active policies checklist
+        // 1. Ensure domain definitions are loaded
+        await loadDomainsAndProfiles();
+
+        // 2. Load user's active policies checklist
         try {
             const policies = await apiFetch("/api/policies");
             state.policies = policies;
             renderPolicyChecklist(policies);
         } catch (e) {
-            showToast("Failed to load policies.", "error");
+            showToast("Failed to load user policies.", "error");
         }
+
+        // 3. Initialize default domain profile if not selected
+        if (el.domainSelect && !el.domainSelect.value) {
+            el.domainSelect.value = "Service and Freelancer Agreements";
+            updateDocTypeOptionsForDomain("Service and Freelancer Agreements", "Service Agreement");
+        }
+    }
+
+    function updateDocTypeOptionsForDomain(domain, preselectedType = null) {
+        if (!el.docTypeSelect) return;
+        el.docTypeSelect.innerHTML = "";
+
+        if (!domain || !state.domains || !state.domains[domain]) {
+            el.docTypeSelect.disabled = true;
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "-- Select Domain First --";
+            el.docTypeSelect.appendChild(opt);
+            if (el.issuingAuthorityGroup) el.issuingAuthorityGroup.classList.add("hidden");
+            if (el.defaultProfileBadge) el.defaultProfileBadge.textContent = "Select Domain & Type";
+            if (el.defaultPolicyChecklist) {
+                el.defaultPolicyChecklist.innerHTML = "";
+                el.defaultPolicyChecklist.appendChild(createEl("p", "empty-desc", "Select a Document Domain and Document Type above to load the applicable default profile."));
+            }
+            return;
+        }
+
+        // Check conditional authority field
+        const needsAuthority = state.authorityDomains && state.authorityDomains.includes(domain);
+        if (el.issuingAuthorityGroup) {
+            if (needsAuthority) {
+                el.issuingAuthorityGroup.classList.remove("hidden");
+            } else {
+                el.issuingAuthorityGroup.classList.add("hidden");
+                if (el.issuingAuthorityInput) el.issuingAuthorityInput.value = "";
+            }
+        }
+
+        const optDefault = document.createElement("option");
+        optDefault.value = "";
+        optDefault.textContent = "-- Select Document Type --";
+        el.docTypeSelect.appendChild(optDefault);
+
+        const types = state.domains[domain] || [];
+        types.forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t;
+            opt.textContent = t;
+            el.docTypeSelect.appendChild(opt);
+        });
+        el.docTypeSelect.disabled = false;
+
+        const targetType = preselectedType && types.includes(preselectedType) ? preselectedType : (types.length > 0 ? types[0] : "");
+        if (targetType) {
+            el.docTypeSelect.value = targetType;
+            loadDefaultPoliciesForSelectedProfile();
+        } else {
+            if (el.defaultPolicyChecklist) {
+                el.defaultPolicyChecklist.innerHTML = "";
+                el.defaultPolicyChecklist.appendChild(createEl("p", "empty-desc", "Select a Document Type to load checks."));
+            }
+        }
+    }
+
+    async function loadDefaultPoliciesForSelectedProfile() {
+        if (!el.domainSelect || !el.docTypeSelect || !el.defaultPolicyChecklist) return;
+
+        const domain = el.domainSelect.value;
+        const docType = el.docTypeSelect.value;
+        const jurisdiction = (el.jurisdictionInput ? el.jurisdictionInput.value.trim() : "India") || "India";
+
+        if (!domain || !docType) {
+            if (el.defaultProfileBadge) el.defaultProfileBadge.textContent = "Select Domain & Type";
+            el.defaultPolicyChecklist.innerHTML = "";
+            el.defaultPolicyChecklist.appendChild(createEl("p", "empty-desc", "Select a Document Domain and Document Type above to load the applicable default profile."));
+            return;
+        }
+
+        if (el.defaultProfileBadge) {
+            el.defaultProfileBadge.textContent = `${domain} · ${docType}`;
+        }
+
+        try {
+            const url = `/api/default-policies?domain=${encodeURIComponent(domain)}&document_type=${encodeURIComponent(docType)}&jurisdiction=${encodeURIComponent(jurisdiction)}`;
+            const res = await apiFetch(url);
+            renderDefaultPolicyChecklist(res.policies || []);
+        } catch (err) {
+            el.defaultPolicyChecklist.innerHTML = "";
+            el.defaultPolicyChecklist.appendChild(createEl("p", "empty-desc", `Failed to load default policies: ${err.message}`));
+        }
+    }
+
+    function renderDefaultPolicyChecklist(policies) {
+        if (!el.defaultPolicyChecklist) return;
+        el.defaultPolicyChecklist.innerHTML = "";
+
+        if (!policies || policies.length === 0) {
+            el.defaultPolicyChecklist.appendChild(createEl("p", "empty-desc", "No default policies applicable for this profile and jurisdiction."));
+            return;
+        }
+
+        policies.forEach(p => {
+            const itemLabel = createEl("label", "policy-check-item default-policy-item");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = p.policy_key;
+            checkbox.checked = p.enabled_by_default !== false;
+            checkbox.setAttribute("data-policy-key", p.policy_key);
+
+            const customCheck = createEl("span", "checkbox-custom");
+            const infoDiv = createEl("div", "policy-check-info");
+
+            const topRow = createEl("div", "policy-check-top-row");
+            const titleSpan = createEl("span", "policy-check-title", p.name);
+
+            // Mandatory vs Recommended badge
+            const isMandatory = (p.requirement_level || "").toLowerCase() === "mandatory";
+            const reqBadge = createEl(
+                "span",
+                `policy-req-badge ${isMandatory ? "badge-mandatory" : "badge-recommended"}`,
+                isMandatory ? "Mandatory Requirement" : "Recommended Review Check"
+            );
+            reqBadge.title = isMandatory
+                ? "Statutory or regulatory requirement verified from official source."
+                : "Standard commercial review check; discretionary or context-specific.";
+
+            topRow.appendChild(titleSpan);
+            topRow.appendChild(reqBadge);
+
+            const descSpan = createEl("span", "policy-check-desc", p.description || p.explanation || "");
+
+            infoDiv.appendChild(topRow);
+            infoDiv.appendChild(descSpan);
+
+            // Source Attribution Pill
+            if (p.source_name) {
+                const srcDiv = createEl("div", "policy-source-tag");
+                const srcIcon = createEl("span", "source-icon", "📜 ");
+                let srcLabelText = `Source: ${p.source_name}`;
+                if (p.source_version) srcLabelText += ` (${p.source_version})`;
+                const srcLabel = createEl("span", "source-label", srcLabelText);
+                srcDiv.appendChild(srcIcon);
+                srcDiv.appendChild(srcLabel);
+                infoDiv.appendChild(srcDiv);
+            }
+
+            itemLabel.appendChild(checkbox);
+            itemLabel.appendChild(customCheck);
+            itemLabel.appendChild(infoDiv);
+
+            el.defaultPolicyChecklist.appendChild(itemLabel);
+        });
+    }
+
+    // Domain and Classification Events
+    if (el.domainSelect) {
+        el.domainSelect.addEventListener("change", () => {
+            const domain = el.domainSelect.value;
+            updateDocTypeOptionsForDomain(domain);
+        });
+    }
+
+    if (el.docTypeSelect) {
+        el.docTypeSelect.addEventListener("change", () => {
+            loadDefaultPoliciesForSelectedProfile();
+        });
+    }
+
+    if (el.jurisdictionInput) {
+        el.jurisdictionInput.addEventListener("change", () => {
+            loadDefaultPoliciesForSelectedProfile();
+        });
+    }
+
+    if (el.toggleDefaultPoliciesBtn) {
+        el.toggleDefaultPoliciesBtn.addEventListener("click", () => {
+            const checkboxes = el.defaultPolicyChecklist.querySelectorAll("input[type='checkbox']");
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => (cb.checked = !allChecked));
+            el.toggleDefaultPoliciesBtn.textContent = allChecked ? "Select All Defaults" : "Deselect All Defaults";
+        });
     }
 
     function renderPolicyChecklist(policies) {
@@ -378,6 +610,15 @@
                 const blob = await resp.blob();
                 const file = new File([blob], sampleName, { type: blob.type });
                 setSelectedFile(file);
+
+                // Auto configure matching domain and document type for sample
+                await loadDomainsAndProfiles();
+                if (el.domainSelect) {
+                    el.domainSelect.value = "Service and Freelancer Agreements";
+                    const docType = sampleName.includes("freelance") ? "Freelance Agreement" : (sampleName.includes("ambiguous") ? "Consulting Agreement" : "Service Agreement");
+                    updateDocTypeOptionsForDomain("Service and Freelancer Agreements", docType);
+                }
+
                 showToast(`Loaded sample contract: ${sampleName}`, "success");
             } catch (err) {
                 showToast(`Could not load sample contract (${err.message})`, "error");
@@ -395,15 +636,52 @@
 
     // Run Analysis
     el.startAnalyzeBtn.addEventListener("click", async () => {
-        if (!state.selectedFile) return;
+        if (!state.selectedFile) {
+            showToast("Please select a contract file to analyze.", "error");
+            return;
+        }
 
-        const checkedBoxes = el.policyChecklist.querySelectorAll("input[type='checkbox']:checked");
-        const selectedPolicyIds = Array.from(checkedBoxes).map(cb => cb.value).join(",");
+        const domain = el.domainSelect ? el.domainSelect.value.trim() : "";
+        const docType = el.docTypeSelect ? el.docTypeSelect.value.trim() : "";
+
+        if (!domain) {
+            showToast("Please select a Document Domain before analyzing.", "error");
+            if (el.domainSelect) el.domainSelect.focus();
+            return;
+        }
+        if (!docType) {
+            showToast("Please select a Document Type before analyzing.", "error");
+            if (el.docTypeSelect) el.docTypeSelect.focus();
+            return;
+        }
+
+        const jurisdiction = (el.jurisdictionInput ? el.jurisdictionInput.value.trim() : "India") || "India";
+        const issuingAuthority = (el.issuingAuthorityInput ? el.issuingAuthorityInput.value.trim() : "") || "";
+
+        // Collect user policy IDs
+        const checkedUserBoxes = el.policyChecklist.querySelectorAll("input[type='checkbox']:checked");
+        const selectedPolicyIds = Array.from(checkedUserBoxes).map(cb => cb.value).join(",");
+
+        // Collect deselected default policy keys
+        let deselectedDefaultKeys = "";
+        if (el.defaultPolicyChecklist) {
+            const uncheckedDefaultBoxes = el.defaultPolicyChecklist.querySelectorAll("input[type='checkbox']:not(:checked)");
+            deselectedDefaultKeys = Array.from(uncheckedDefaultBoxes)
+                .map(cb => cb.getAttribute("data-policy-key") || cb.value)
+                .filter(Boolean)
+                .join(",");
+        }
+
         const useNemotron = el.nemotronOptIn.checked;
 
         const formData = new FormData();
         formData.append("file", state.selectedFile);
+        formData.append("domain", domain);
+        formData.append("document_type", docType);
+        formData.append("jurisdiction", jurisdiction);
+        if (issuingAuthority) formData.append("issuing_authority", issuingAuthority);
         if (selectedPolicyIds) formData.append("policy_ids", selectedPolicyIds);
+        if (deselectedDefaultKeys) formData.append("deselected_default_keys", deselectedDefaultKeys);
         formData.append("use_nemotron", useNemotron ? "true" : "false");
 
         // UI progress state
@@ -460,6 +738,26 @@
         // Title and header
         el.reviewDocTitle.textContent = analysis.filename;
         el.reviewDocTypeBadge.textContent = (analysis.file_type || "pdf").toUpperCase();
+
+        // Domain & Doc Type Header Badge
+        if (analysis.domain && analysis.document_type) {
+            el.reviewDomainBadge.textContent = `${analysis.domain} · ${analysis.document_type}`;
+            el.reviewDomainBadge.classList.remove("hidden");
+        } else if (analysis.domain) {
+            el.reviewDomainBadge.textContent = analysis.domain;
+            el.reviewDomainBadge.classList.remove("hidden");
+        } else {
+            el.reviewDomainBadge.classList.add("hidden");
+        }
+
+        // Summary Strip Profile
+        if (analysis.domain && analysis.document_type) {
+            let profileText = `${analysis.domain} · ${analysis.document_type}`;
+            if (analysis.jurisdiction) profileText += ` (${analysis.jurisdiction})`;
+            el.summaryDomainProfile.textContent = profileText;
+        } else {
+            el.summaryDomainProfile.textContent = "General";
+        }
 
         // Download Report Button Link
         el.downloadPdfReportBtn.onclick = () => {
@@ -646,11 +944,39 @@
             policySnap = JSON.parse(finding.policy_snapshot_json);
         } catch (_) {}
 
-        if (policySnap && policySnap.name) {
-            const polTag = createEl("span", "meta-policy", `Policy: ${policySnap.name}`);
-            metaRow.appendChild(polTag);
+        if (policySnap) {
+            const isDefault = policySnap.source === "domain_default";
+            const srcBadge = createEl(
+                "span",
+                `meta-tag ${isDefault ? "meta-tag-default" : "meta-tag-user"}`,
+                isDefault ? "Domain Default" : "My Policy"
+            );
+            metaRow.appendChild(srcBadge);
+
+            if (isDefault && policySnap.requirement_level) {
+                const isMandatory = policySnap.requirement_level.toLowerCase() === "mandatory";
+                const reqTag = createEl(
+                    "span",
+                    `meta-tag ${isMandatory ? "meta-tag-mandatory" : "meta-tag-recommended"}`,
+                    isMandatory ? "Mandatory" : "Recommended"
+                );
+                metaRow.appendChild(reqTag);
+            }
+
+            if (policySnap.name) {
+                const polTag = createEl("span", "meta-policy", `Policy: ${policySnap.name}`);
+                metaRow.appendChild(polTag);
+            }
         }
         card.appendChild(metaRow);
+
+        // Reference Source Attribution
+        if (policySnap && policySnap.source_name) {
+            let srcNoteText = `📜 Reference: ${policySnap.source_name}`;
+            if (policySnap.source_version) srcNoteText += ` (${policySnap.source_version})`;
+            const srcNote = createEl("div", "finding-source-note", srcNoteText);
+            card.appendChild(srcNote);
+        }
 
         // Plain-Language Explanation (XSS safe)
         const expP = createEl("p", "finding-explanation", finding.explanation);
@@ -1090,6 +1416,18 @@
 
                 const tdName = createEl("td", "td-filename", item.filename);
                 tr.appendChild(tdName);
+
+                const tdDomain = createEl("td", "td-domain-tag");
+                if (item.domain && item.document_type) {
+                    const pill = createEl("span", "history-domain-tag", `${item.domain} · ${item.document_type}`);
+                    tdDomain.appendChild(pill);
+                } else if (item.domain) {
+                    const pill = createEl("span", "history-domain-tag", item.domain);
+                    tdDomain.appendChild(pill);
+                } else {
+                    tdDomain.textContent = "—";
+                }
+                tr.appendChild(tdDomain);
 
                 const tdType = createEl("td", null, (item.file_type || "pdf").toUpperCase());
                 tr.appendChild(tdType);

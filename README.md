@@ -78,13 +78,85 @@ Open your browser and navigate to:
 
 ### Running the Full Test Suite
 ```powershell
-# Run all 56 automated tests with pytest
+# Run all 70 automated tests with pytest
 pytest -v
 ```
 
 ---
 
-## 5. Enabling Nemotron (P2 Optional Integration)
+## 5. Domain-Specific Default Policy Profiles
+
+ClauseLens features a built-in library of **48 domain-specific default policy profiles** spanning 6 major legal and operational domains. When a user classifies a document by Domain, Document Type, and Jurisdiction, the system automatically loads the corresponding profile while seamlessly evaluating the user's enabled custom policies alongside it.
+
+### Supported Domains & Document Types
+
+| Domain | Document Types Supported | Authority Field |
+| :--- | :--- | :--- |
+| **Government Documents** | Government Application Form, Government Notice or Instructions, Government Policy or Regulation, Government Declaration, Other Government Document | Optional (Ministry, Department, Agency) |
+| **Government Tenders & Procurement** | Tender / Request for Proposal, Bid Document, Procurement Contract, Other Procurement Document | Optional (Procurement Authority, Department) |
+| **Employment Documents** | Employment Offer Letter, Employment Agreement, Other Employment Document | N/A |
+| **Service & Freelancer Agreements** | Freelance Agreement, Service Agreement, Consulting Agreement, Other Service Document | N/A |
+| **Non-Disclosure Agreements (NDA)** | One-Way NDA, Mutual NDA, Other Confidentiality Document | N/A |
+| **Lease & Rental Agreements** | Residential Rental Agreement, Commercial Lease, Leave-and-License Agreement, Other Property Document | N/A |
+
+### Verified Statutory Requirements vs. Recommended Review Checks
+
+ClauseLens strictly maintains a transparent legal distinction between verified legal mandates and commercial best practices:
+
+- **Mandatory Requirements (`badge-mandatory` / `requirement_level: "mandatory"`):**
+  Derived directly from verified statutory frameworks, official codes, and regulatory enactments.
+  *Examples include:*
+  - General Financial Rules (GFR 2017) Rule 170 (Bid Security & EMD requirements for public tenders)
+  - Right to Information Act (RTI Act 2005) Section 7 (Application deadlines and authority designations)
+  - Indian Contract Act 1872 Section 28 (Agreements in restraint of legal proceedings)
+  - Model Tenancy Act 2021 Section 8 (Security deposit ceilings and receipt provisions)
+  - Minimum Wages Act 1948 Section 12 (Statutory minimum compensation guidelines)
+  Every mandatory requirement includes official citation metadata (`source_name`, `source_url`, `source_version`).
+
+- **Recommended Review Checks (`badge-recommended` / `requirement_level: "recommended"`):**
+  Standard commercial precautions, industry best practices, and risk-mitigation review checks where no universal statutory limit exists.
+  *Examples include:*
+  - Freelance change request procedures and acceptance milestone definitions
+  - Confidentiality exclusions and return-of-materials protocols
+  - Service agreement subcontracting restrictions and rent escalation review checks
+
+### Policy Merging Algorithm
+1. **Catalog Lookup:** The engine resolves all default checks matching the selected `(Domain, Document Type, Jurisdiction)`. For "Other" document types, only generic domain-level checks apply.
+2. **Jurisdiction Filtering:** Checks tagged with a specific jurisdiction (e.g. `India`) are not applied to foreign jurisdictions unless marked `Any` or `*`.
+3. **User Policy Union:** All active, enabled user policies are appended.
+4. **Coexistence over Discarding:** If a user policy shares a category with a default check (e.g. default check requires payment terms, while user policy enforces payment $\le 30$ days), **both** checks are evaluated independently. Finding the clause satisfies the presence check; the numeric engine separately evaluates the deadline.
+5. **Session Deselection:** Users may uncheck individual default policies for a specific analysis without mutating the underlying database catalog.
+
+### How to Add or Update a Policy Profile
+Default profiles are defined declaratively in `services/default_policy_service.py` within `DEFAULT_POLICY_CATALOG`. To register a new rule:
+```python
+{
+    "policy_key": "my_new_domain_check",
+    "domain": "Employment Documents",
+    "document_types": ["Employment Agreement"],
+    "jurisdiction": "India",
+    "name": "Probation Period Limit",
+    "description": "Verifies that probation terms do not exceed 6 months without formal extension.",
+    "category": "probation",
+    "rule_type": "maximum_value",
+    "requirement_level": "recommended",
+    "parameters": {
+        "cues": ["probation", "probationary period", "trial period"],
+        "max_value": 180,
+        "unit": "days"
+    },
+    "enabled_by_default": True,
+    "source_name": "Standard Indian Employment Practice",
+    "source_version": "2026-Q1",
+    "created_at": _now_iso(),
+    "updated_at": _now_iso()
+}
+```
+Re-running `database.init_db()` or restarting the application will automatically synchronize the updated definitions into the local SQLite database.
+
+---
+
+## 6. Enabling Nemotron (P2 Optional Integration)
 
 ClauseLens operates 100% locally and does not require Nemotron for complete functionality. To connect Nemotron:
 
@@ -104,49 +176,51 @@ ClauseLens operates 100% locally and does not require Nemotron for complete func
 
 ---
 
-## 6. 3-Minute Demo Script
+## 7. 3-Minute Demo Script
 
 Follow this sequence to showcase the full capabilities of ClauseLens:
 
 ### Minute 1: Dashboard & Risky Contract Verification
 1. Open `http://127.0.0.1:5000` — see the **Contract Policy Dashboard** showing clean, live SQLite statistics and active policies.
 2. Click **"Start New Analysis"**.
-3. Under **Quick Demo Samples**, click **"Risky Agreement (PDF)"** (or drag & drop `sample_contracts/risky_services_agreement.pdf`).
-4. Click **"Analyze Contract"**.
-5. Within 1 second, the **Review Workspace** opens:
-   - Notice the top summary: **5 Potential Conflicts**, **3 Reviews Recommended**, **0 No Conflict**.
-   - Notice the banner: *"Advanced interpretation was not used. Results are rule-based."*
+3. Under **Document Domain & Classification**, select **Service and Freelancer Agreements** and document type **Service Agreement**.
+4. Observe the **Default Policies for This Document** section automatically populate with 8 verified and recommended checks (e.g. Scope of Work, Deliverables, Payment Terms, Tax & Invoicing).
+5. Under **Quick Demo Samples**, click **"Risky Agreement (PDF)"**.
+6. Click **"Analyze Contract"**.
+7. Within 1 second, the **Review Workspace** opens:
+   - Notice the summary strip: **5 Potential Conflicts**, **3 Reviews Recommended**, **0 No Conflict**.
+   - Notice the Domain Badge: `Service and Freelancer Agreements · Service Agreement`.
+   - Each finding explicitly displays its source tag: `Domain Default` (with Mandatory/Recommended pill and source citation) or `My Policy`.
    - Click the first finding: **"Payment period exceeds your limit"**.
    - Observe how the left panel automatically scrolls and highlights Page 2: *"within sixty (60) days of invoice date"*.
-   - Click the renewal finding: see Page 3 highlighted for automatic one-year renewal.
-   - Click the liability finding: see Page 4 highlighted for unlimited liability.
-   - Click the jurisdiction finding: see Page 4 highlighted for New York venue.
 
 ### Minute 2: PDF Audit Report & Compliant Agreement
 1. In the Review Workspace, click **"Download PDF Report"**.
 2. Open the downloaded PDF:
-   - Notice the clean ReportLab styling, document metadata table, summary metrics, and policy snapshot.
+   - Notice the clean ReportLab styling, document metadata table (including Domain, Document Type, and Jurisdiction), summary metrics, and policy snapshot.
    - Notice the mandatory legal disclaimer: *"ClauseLens provides policy-based assistance and is not legal advice..."*
    - See running footers with dynamic page numbering (*"Page 1 of 2"*).
 3. Click **"New Analysis"** in the sidebar.
-4. Click **"Compliant Agreement (PDF)"** and click **"Analyze Contract"**.
+4. Select **"Compliant Agreement (PDF)"** and click **"Analyze Contract"**.
 5. Observe the result: **0 Potential Conflicts**. Notice the finding titles state *"aligns with policy limit"*; none declare the contract "safe" or "legal".
 
 ### Minute 3: Ambiguous DOCX, Policy Customization & Data Retention
 1. Click **"New Analysis"** -> click **"Ambiguous Agreement (DOCX)"** -> click **"Analyze Contract"**.
-2. In the Review Workspace, see **4 Review Recommended** items with labels like *"Paragraph 2"*, *"Paragraph 3"*, and *"Needs interpretation"*.
+2. In the Review Workspace, see **Review Recommended** items with labels like *"Paragraph 2"*, *"Paragraph 3"*, and *"Needs interpretation"*.
 3. Go to **"My Policies"** in the sidebar:
    - View your active policies.
    - Click **"Add New Policy"** or toggle one off to demonstrate real-time policy customization.
 4. Go to **"Analysis History"**:
-   - See all uploaded agreements stored locally in SQLite with their conflict counts.
+   - See all uploaded agreements stored locally in SQLite with their Domain/Type tags and conflict counts.
    - Click **"Open"** to reload any past review instantly without re-uploading.
    - Click **"Purge Expired"** or **"Delete All"** to demonstrate local privacy control and zero leftover files.
 
 ---
 
-## 7. Known Limitations
-1. **No OCR:** Scanned image-only PDFs without an extractable text layer cannot be parsed in this version. The app detects scanned PDFs (< 100 characters) and displays an explicit notification recommending OCR. An extension point stub `ocr_extension_stub` is documented in `services/document_reader.py`.
-2. **Nemotron Local Mock Testing:** As stated in the hackathon rules, live Nemotron endpoints cannot be reached from this environment. The Nemotron integration is fully tested against local mock servers and strictly falls back to rule-based evaluation.
+## 8. Known Limitations & Unverified Profile Requirements
+1. **Strictly Textual Scope:** ClauseLens operates entirely on textual document layers. Photograph inspection, facial recognition, signature biometric inspection, and visual layout rendering are intentionally excluded by architecture.
+2. **Scanned Documents Without Text Layer:** Scanned image-only PDFs without an extractable text layer cannot be parsed in this version. The app detects scanned PDFs (< 100 characters) and displays an explicit notification recommending OCR. An extension point stub `ocr_extension_stub` is documented in `services/document_reader.py`.
+3. **Statutory vs. Discretionary Limits:** For domain checks where statutory codes do not prescribe an exact numerical ceiling (e.g., NDA confidentiality durations or commercial freelance termination notice periods), ClauseLens evaluates presence and reasonableness as recommended review checks rather than fabricating non-existent statutory caps.
+4. **Nemotron Local Mock Testing:** Live Nemotron endpoints require user opt-in and valid API credentials. In offline environments, the application deterministically falls back to the local rule engine.
 3. **Single-User Architecture:** ClauseLens binds to `127.0.0.1:5000` for a single local user without authentication.
 4. **Regex-Based Detection:** Highly unusual phrasing or non-standard contractual jargon may trigger `review_recommended` instead of an automatic extraction, which is by design to prioritize human review over false certainty.

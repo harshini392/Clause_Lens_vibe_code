@@ -179,7 +179,7 @@ def generate_pdf_report(
     # Document Overview Table
     doc_meta_data = [
         [
-            Paragraph("<b>Document Type:</b>", body_style),
+            Paragraph("<b>File Format:</b>", body_style),
             Paragraph(file_type, body_style),
             Paragraph("<b>Length:</b>", body_style),
             Paragraph(escape_text(length_desc), body_style)
@@ -191,6 +191,27 @@ def generate_pdf_report(
             Paragraph("Yes (Nemotron)" if nemotron_used else "No (Rule-based only)", body_style)
         ]
     ]
+
+    domain_val = analysis.get("domain")
+    doc_type_val = analysis.get("document_type")
+    if domain_val or doc_type_val:
+        doc_meta_data.append([
+            Paragraph("<b>Domain:</b>", body_style),
+            Paragraph(escape_text(str(domain_val or "Not Specified")), body_style),
+            Paragraph("<b>Document Profile:</b>", body_style),
+            Paragraph(escape_text(str(doc_type_val or "General")), body_style)
+        ])
+
+    jurisdiction_val = analysis.get("jurisdiction")
+    issuing_auth_val = analysis.get("issuing_authority")
+    if jurisdiction_val or issuing_auth_val:
+        doc_meta_data.append([
+            Paragraph("<b>Jurisdiction:</b>", body_style),
+            Paragraph(escape_text(str(jurisdiction_val or "India")), body_style),
+            Paragraph("<b>Issuing Authority:</b>", body_style),
+            Paragraph(escape_text(str(issuing_auth_val or "Not Specified")), body_style)
+        ])
+
     t_meta = Table(doc_meta_data, colWidths=[110, 140, 110, 140])
     t_meta.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -248,22 +269,25 @@ def generate_pdf_report(
 
     # Active Policies Evaluated
     story.append(Paragraph("Active Policies Evaluated", section_heading))
+    if isinstance(policies, dict) and "policies" in policies:
+        policies = policies["policies"]
+
     if policies:
-        p_data = [["Policy Name", "Type", "Mode", "Standard / Parameter"]]
+        p_data = [["Policy Name", "Type", "Source", "Standard / Parameter"]]
         for p in policies:
             p_name = escape_text(p.get("name", "Unnamed"))
             p_type = escape_text(p.get("type", "").capitalize())
-            p_mode = escape_text(p.get("mode", "structured").capitalize())
-            raw_p = p.get("params_json", "{}")
+            p_source = "Default Profile" if p.get("source") == "domain_default" else "User Policy"
+            raw_p = p.get("params_json") if p.get("params_json") is not None else p.get("params", {})
             p_params = json.loads(raw_p) if isinstance(raw_p, str) else raw_p
             p_desc = escape_text(json.dumps(p_params)) if p_params else escape_text(p.get("explanation", ""))
             p_data.append([
                 Paragraph(f"<b>{p_name}</b>", body_style),
                 Paragraph(p_type, body_style),
-                Paragraph(p_mode, body_style),
+                Paragraph(p_source, body_style),
                 Paragraph(p_desc, body_style)
             ])
-        t_pol = Table(p_data, colWidths=[140, 70, 70, 220])
+        t_pol = Table(p_data, colWidths=[140, 70, 80, 210])
         t_pol.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EDF2F7")),
             ("LINEBELOW", (0, 0), (-1, 0), 1, colors.HexColor("#CBD5E1")),

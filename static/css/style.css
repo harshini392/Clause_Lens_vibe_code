@@ -1424,3 +1424,162 @@ body {
         box-shadow: none !important;
     }
 }
+
+/* Domain Profile & Policy Verification Enhancements */
+.domain-select-card {
+    grid-column: 1 / -1;
+}
+.domain-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+}
+.required-indicator {
+    color: #DC2626;
+    font-weight: bold;
+}
+.policy-select-card {
+    grid-column: 1 / -1;
+}
+.policy-profile-section {
+    margin-bottom: 16px;
+}
+.policy-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.policy-section-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.policy-subheading {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+.profile-info-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #CBD5E1;
+}
+.profile-info-blue {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-color: #BFDBFE;
+}
+.policy-section-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+.section-divider {
+    border: none;
+    border-top: 1px dashed var(--border-color);
+    margin: 16px 0;
+}
+.policy-check-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.policy-req-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.badge-mandatory {
+    background: #FEF2F2;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+}
+.badge-recommended {
+    background: #F0FDF4;
+    color: #15803D;
+    border: 1px solid #86EFAC;
+}
+.policy-source-tag {
+    margin-top: 5px;
+    font-size: 11px;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.policy-source-tag .source-label {
+    font-style: italic;
+}
+.meta-tag-default {
+    background: #EDE9FE;
+    color: #5B21B6;
+    border-color: #DDD6FE;
+}
+.meta-tag-user {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-color: #BFDBFE;
+}
+.meta-tag-mandatory {
+    background: #FEF2F2;
+    color: #991B1B;
+    border-color: #FECACA;
+}
+.meta-tag-recommended {
+    background: #F0FDF4;
+    color: #166534;
+    border-color: #BBF7D0;
+}
+.finding-source-note {
+    font-size: 11px;
+    color: #64748B;
+    font-style: italic;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-subtle);
+}
+.doc-domain-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #EDE9FE;
+    color: #5B21B6;
+    border: 1px solid #C4B5FD;
+}
+.summary-pill.pill-domain {
+    background: #FAF5FF;
+    border-color: #E9D5FF;
+    color: #6B21A8;
+}
+.td-domain-tag {
+    font-size: 12px;
+    color: #475569;
+    max-width: 220px;
+}
+.history-domain-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+}
