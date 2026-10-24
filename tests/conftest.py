@@ -1,4 +1,4 @@
-"""Pytest fixtures and test setup for ClauseLens."""
+"""Pytest fixtures and test setup for ClauseSight."""
 import os
 import shutil
 import tempfile
@@ -26,7 +26,7 @@ def sample_dir():
 def test_db():
     """Create a clean isolated SQLite database for each test."""
     temp_dir = tempfile.mkdtemp()
-    db_path = os.path.join(temp_dir, "test_clauselens.db")
+    db_path = os.path.join(temp_dir, "test_clausesight.db")
     orig_path = config.DATABASE_PATH
     config.DATABASE_PATH = db_path
 

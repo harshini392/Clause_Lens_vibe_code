@@ -1,4 +1,4 @@
-"""Clause Detection Service for ClauseLens.
+"""Clause Detection Service for ClauseSight.
 Detects contract clauses across payment, renewal, liability, indemnification,
 jurisdiction, and termination using regex and keyword patterns with confidence scoring.
 """

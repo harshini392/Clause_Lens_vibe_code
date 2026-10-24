@@ -1,4 +1,4 @@
-"""Domain-Specific Default Policy Profiles and Merging Service for ClauseLens.
+"""Domain-Specific Default Policy Profiles and Merging Service for ClauseSight.
 
 Provides curated, versioned default policy profiles for 6 major document domains:
 1. Government Documents

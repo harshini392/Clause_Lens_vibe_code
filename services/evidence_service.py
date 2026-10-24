@@ -1,4 +1,4 @@
-"""Evidence Service for ClauseLens.
+"""Evidence Service for ClauseSight.
 Handles conservative sentence segmentation, deterministic evidence ID assignment
 (ev_0001, ev_0002, ...), character offset tracking, and database persistence/lookup.
 """

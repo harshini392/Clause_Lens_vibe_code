@@ -56,7 +56,7 @@ def test_pdf_report_with_findings():
     doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     assert len(doc) >= 1
     full_text = " ".join(page.get_text() for page in doc)
-    assert "ClauseLens Policy Review Report" in full_text
+    assert "ClauseSight Policy Review Report" in full_text
     assert "Sample_Contract.pdf" in full_text
     assert "not legal advice" in full_text
     assert "Client shall remit payment within sixty (60) days" in full_text
@@ -100,7 +100,7 @@ def test_pdf_report_download_endpoint(client, sample_dir):
     assert rep_res.status_code == 200
     assert rep_res.headers["Content-Type"] == "application/pdf"
     assert "attachment" in rep_res.headers["Content-Disposition"]
-    assert "ClauseLens_Report" in rep_res.headers["Content-Disposition"]
+    assert "ClauseSight_Report" in rep_res.headers["Content-Disposition"]
     assert rep_res.data.startswith(b"%PDF-")
 
     # Invalid ID -> 404

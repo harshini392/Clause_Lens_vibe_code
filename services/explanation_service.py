@@ -1,4 +1,4 @@
-"""Explanation Service for ClauseLens.
+"""Explanation Service for ClauseSight.
 Provides deterministic, legally responsible plain-language explanations
 and actionable next steps. Never uses forbidden words ('safe', 'legal', 'illegal', etc.).
 """

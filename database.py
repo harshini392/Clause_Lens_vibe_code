@@ -1,4 +1,4 @@
-"""SQLite persistence and schema management for ClauseLens."""
+"""SQLite persistence and schema management for ClauseSight."""
 import sqlite3
 import json
 from datetime import datetime, timezone, timedelta

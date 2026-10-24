@@ -1,4 +1,4 @@
-"""Document Reader Service for ClauseLens.
+"""Document Reader Service for ClauseSight.
 Handles upload validation, magic byte verification, and text extraction
 for PDF (via PyMuPDF) and DOCX (via python-docx) with location tracking.
 """
@@ -49,7 +49,7 @@ class PasswordProtectedError(DocumentReaderError):
 
 def ocr_extension_stub(file_path: str) -> str:
     """OCR Extension Point.
-    ClauseLens does not perform Optical Character Recognition in this version.
+    ClauseSight does not perform Optical Character Recognition in this version.
     To enable OCR in future versions, hook an OCR pipeline (such as Tesseract,
     EasyOCR, or a secure local vision model) into this function.
     """

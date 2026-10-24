@@ -1,1 +1,1 @@
-"""ClauseLens backend services."""
+"""ClauseSight backend services."""

@@ -1,4 +1,4 @@
-"""Rule Engine Service for ClauseLens.
+"""Rule Engine Service for ClauseSight.
 Evaluates detected clauses against user policies deterministically.
 Implements the decision table for payment, renewal, liability, and jurisdiction,
 and informational evaluation for indemnification and termination.

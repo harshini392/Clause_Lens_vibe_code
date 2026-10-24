@@ -1,4 +1,4 @@
-"""Nemotron Service for ClauseLens (P2 Optional Integration).
+"""Nemotron Service for ClauseSight (P2 Optional Integration).
 Communicates with an OpenAI-compatible Nemotron endpoint for ambiguous clauses.
 Enforces privacy safeguards: sends only relevant ambiguous segments, never logs
 contract text, validates schema strictly, and gracefully falls back to rule-based mode.

@@ -1,4 +1,4 @@
-"""Comprehensive End-to-End API and Acceptance Tests for ClauseLens.
+"""Comprehensive End-to-End API and Acceptance Tests for ClauseSight.
 Validates the entire pipeline against Section 17 acceptance criteria:
 upload, segmentation, clause detection, policy matching, quotes, locations,
 security, CSRF, stats, retention purge, and temp file hygiene.

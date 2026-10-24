@@ -1,6 +1,6 @@
-# ClauseLens Sample Contracts and Test Fixtures
+# ClauseSight Sample Contracts and Test Fixtures
 
-This directory contains fictional, programmatically generated test contracts and edge cases designed to validate ClauseLens against policy evaluation rules, boundary conditions, and file validation handlers.
+This directory contains fictional, programmatically generated test contracts and edge cases designed to validate ClauseSight against policy evaluation rules, boundary conditions, and file validation handlers.
 
 ## Canonical Demo Policy Set
 For demonstration and evaluation, the recommended demo policies are:

@@ -1,4 +1,4 @@
-"""Generate realistic sample contracts and edge cases for ClauseLens testing and demonstration.
+"""Generate realistic sample contracts and edge cases for ClauseSight testing and demonstration.
 Creates all required sample files in sample_contracts/ using ReportLab, python-docx, and PyMuPDF.
 """
 import os

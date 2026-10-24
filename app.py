@@ -1,4 +1,4 @@
-"""ClauseLens Main Application Server.
+"""ClauseSight Main Application Server.
 Provides the REST API, security middleware, upload handling, and static file serving.
 Local-only, privacy-first, zero cloud dependencies.
 """
@@ -32,7 +32,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("clauselens")
+logger = logging.getLogger("clausesight")
 
 app = Flask(
     __name__,
@@ -44,7 +44,7 @@ app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
 
 
 # --- CSRF Protection Helper ---
-CSRF_COOKIE_NAME = "clauselens_csrf"
+CSRF_COOKIE_NAME = "clausesight_csrf"
 
 
 def generate_csrf_token() -> str:
@@ -57,7 +57,7 @@ def verify_csrf():
     if request.method in ("POST", "PUT", "DELETE"):
         # Check X-CSRF-Token header
         token_header = request.headers.get("X-CSRF-Token")
-        token_cookie = request.cookies.get(CSRF_COOKIE_NAME)
+        token_cookie = request.cookies.get(CSRF_COOKIE_NAME) or request.cookies.get("clauselens_csrf")
 
         if not token_header or not token_cookie or not secrets.compare_digest(token_header, token_cookie):
             # Special case: allow if test client specifically bypasses or header matches
@@ -1029,7 +1029,7 @@ def download_pdf_report(analysis_id: str):
 
         # Sanitize filename for download header
         safe_base = secure_filename(analysis.get("filename", "contract")).replace(".", "_")
-        pdf_filename = f"ClauseLens_Report_{safe_base}.pdf"
+        pdf_filename = f"ClauseSight_Report_{safe_base}.pdf"
 
         return send_file(
             io.BytesIO(pdf_bytes),
@@ -1066,5 +1066,5 @@ def create_app():
 if __name__ == "__main__":
     database.init_db()
     database.seed_demo_policies()
-    print(f"ClauseLens starting on http://{config.HOST}:{config.PORT} (Debug: {config.DEBUG})")
+    print(f"ClauseSight starting on http://{config.HOST}:{config.PORT} (Debug: {config.DEBUG})")
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)

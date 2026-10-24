@@ -1,1 +1,1 @@
-"""ClauseLens test suite."""
+"""ClauseSight test suite."""

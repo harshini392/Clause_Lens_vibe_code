@@ -1,4 +1,4 @@
-"""Configuration settings for ClauseLens."""
+"""Configuration settings for ClauseSight."""
 import os
 from pathlib import Path
 
@@ -21,10 +21,13 @@ if _env_path.is_file():
 HOST = os.getenv("HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", "5000"))
 DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
-SECRET_KEY = os.getenv("SECRET_KEY", "clauselens-secure-local-session-secret-key-2026")
+SECRET_KEY = os.getenv("SECRET_KEY", "clausesight-secure-local-session-secret-key-2026")
 
 # Database & Storage
-DATABASE_PATH = os.getenv("DATABASE_PATH", str(BASE_DIR / "clauselens.db"))
+_legacy_db = BASE_DIR / "clauselens.db"
+_default_db = BASE_DIR / "clausesight.db"
+_db_default = str(_default_db if _default_db.exists() or not _legacy_db.exists() else _legacy_db)
+DATABASE_PATH = os.getenv("DATABASE_PATH", _db_default)
 TEMP_UPLOAD_DIR = BASE_DIR / "temp_uploads"
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 

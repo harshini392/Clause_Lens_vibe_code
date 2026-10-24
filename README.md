@@ -1,6 +1,6 @@
-# ClauseLens — Privacy-First Contract Policy Verification
+# ClauseSight — Privacy-First Contract Policy Verification
 
-ClauseLens is a local, privacy-first web application that checks uploaded legal agreements (PDF or DOCX) against your **own** policies and produces evidence-backed, verifiable findings. It provides policy-based assistance and is **not legal advice**. It never declares a contract "safe", "legal", or "illegal".
+ClauseSight is a local, privacy-first web application that checks uploaded legal agreements (PDF or DOCX) against your **own** policies and produces evidence-backed, verifiable findings. It provides policy-based assistance and is **not legal advice**. It never declares a contract "safe", "legal", or "illegal".
 
 ---
 
@@ -55,7 +55,7 @@ As required by the specification, the following design decisions were made for u
 ### Setup & Installation
 ```powershell
 # Navigate into the project folder
-cd ClauseLens
+cd ClauseSight
 
 # Create and activate virtual environment
 python -m venv venv
@@ -86,7 +86,7 @@ pytest -v
 
 ## 5. Domain-Specific Default Policy Profiles
 
-ClauseLens features a built-in library of **48 domain-specific default policy profiles** spanning 6 major legal and operational domains. When a user classifies a document by Domain, Document Type, and Jurisdiction, the system automatically loads the corresponding profile while seamlessly evaluating the user's enabled custom policies alongside it.
+ClauseSight features a built-in library of **48 domain-specific default policy profiles** spanning 6 major legal and operational domains. When a user classifies a document by Domain, Document Type, and Jurisdiction, the system automatically loads the corresponding profile while seamlessly evaluating the user's enabled custom policies alongside it.
 
 ### Supported Domains & Document Types
 
@@ -101,7 +101,7 @@ ClauseLens features a built-in library of **48 domain-specific default policy pr
 
 ### Verified Statutory Requirements vs. Recommended Review Checks
 
-ClauseLens strictly maintains a transparent legal distinction between verified legal mandates and commercial best practices:
+ClauseSight strictly maintains a transparent legal distinction between verified legal mandates and commercial best practices:
 
 - **Mandatory Requirements (`badge-mandatory` / `requirement_level: "mandatory"`):**
   Derived directly from verified statutory frameworks, official codes, and regulatory enactments.
@@ -158,7 +158,7 @@ Re-running `database.init_db()` or restarting the application will automatically
 
 ## 6. Enabling Nemotron (P2 Optional Integration)
 
-ClauseLens operates 100% locally and does not require Nemotron for complete functionality. To connect Nemotron:
+ClauseSight operates 100% locally and does not require Nemotron for complete functionality. To connect Nemotron:
 
 1. Copy `.env.example` to `.env`:
    ```powershell
@@ -172,13 +172,13 @@ ClauseLens operates 100% locally and does not require Nemotron for complete func
    NEMOTRON_MODEL=nvidia/nemotron-4-340b-instruct
    NEMOTRON_TIMEOUT=20
    ```
-3. Restart the server. In the UI, tick the checkbox **"Opt-in to Advanced AI Interpretation"** during upload. Only segments for ambiguous clauses are sent to the endpoint. If the endpoint is unreachable, timed out, or returns invalid schema, ClauseLens automatically falls back to rule-based evaluation without crashing.
+3. Restart the server. In the UI, tick the checkbox **"Opt-in to Advanced AI Interpretation"** during upload. Only segments for ambiguous clauses are sent to the endpoint. If the endpoint is unreachable, timed out, or returns invalid schema, ClauseSight automatically falls back to rule-based evaluation without crashing.
 
 ---
 
 ## 7. 3-Minute Demo Script
 
-Follow this sequence to showcase the full capabilities of ClauseLens:
+Follow this sequence to showcase the full capabilities of ClauseSight:
 
 ### Minute 1: Dashboard & Risky Contract Verification
 1. Open `http://127.0.0.1:5000` — see the **Contract Policy Dashboard** showing clean, live SQLite statistics and active policies.
@@ -198,7 +198,7 @@ Follow this sequence to showcase the full capabilities of ClauseLens:
 1. In the Review Workspace, click **"Download PDF Report"**.
 2. Open the downloaded PDF:
    - Notice the clean ReportLab styling, document metadata table (including Domain, Document Type, and Jurisdiction), summary metrics, and policy snapshot.
-   - Notice the mandatory legal disclaimer: *"ClauseLens provides policy-based assistance and is not legal advice..."*
+   - Notice the mandatory legal disclaimer: *"ClauseSight provides policy-based assistance and is not legal advice..."*
    - See running footers with dynamic page numbering (*"Page 1 of 2"*).
 3. Click **"New Analysis"** in the sidebar.
 4. Select **"Compliant Agreement (PDF)"** and click **"Analyze Contract"**.
@@ -218,9 +218,9 @@ Follow this sequence to showcase the full capabilities of ClauseLens:
 ---
 
 ## 8. Known Limitations & Unverified Profile Requirements
-1. **Strictly Textual Scope:** ClauseLens operates entirely on textual document layers. Photograph inspection, facial recognition, signature biometric inspection, and visual layout rendering are intentionally excluded by architecture.
+1. **Strictly Textual Scope:** ClauseSight operates entirely on textual document layers. Photograph inspection, facial recognition, signature biometric inspection, and visual layout rendering are intentionally excluded by architecture.
 2. **Scanned Documents Without Text Layer:** Scanned image-only PDFs without an extractable text layer cannot be parsed in this version. The app detects scanned PDFs (< 100 characters) and displays an explicit notification recommending OCR. An extension point stub `ocr_extension_stub` is documented in `services/document_reader.py`.
-3. **Statutory vs. Discretionary Limits:** For domain checks where statutory codes do not prescribe an exact numerical ceiling (e.g., NDA confidentiality durations or commercial freelance termination notice periods), ClauseLens evaluates presence and reasonableness as recommended review checks rather than fabricating non-existent statutory caps.
+3. **Statutory vs. Discretionary Limits:** For domain checks where statutory codes do not prescribe an exact numerical ceiling (e.g., NDA confidentiality durations or commercial freelance termination notice periods), ClauseSight evaluates presence and reasonableness as recommended review checks rather than fabricating non-existent statutory caps.
 4. **Nemotron Local Mock Testing:** Live Nemotron endpoints require user opt-in and valid API credentials. In offline environments, the application deterministically falls back to the local rule engine.
-3. **Single-User Architecture:** ClauseLens binds to `127.0.0.1:5000` for a single local user without authentication.
+3. **Single-User Architecture:** ClauseSight binds to `127.0.0.1:5000` for a single local user without authentication.
 4. **Regex-Based Detection:** Highly unusual phrasing or non-standard contractual jargon may trigger `review_recommended` instead of an automatic extraction, which is by design to prioritize human review over false certainty.

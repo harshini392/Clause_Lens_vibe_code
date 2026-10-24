@@ -1,5 +1,5 @@
 /**
- * ClauseLens Frontend Application
+ * ClauseSight Frontend Application
  * Vanilla JS, Zero External Libraries.
  * Implements hash routing, CSRF handling, accessible DOM manipulation,
  * XSS-safe text rendering, split-screen review, and keyboard navigation.

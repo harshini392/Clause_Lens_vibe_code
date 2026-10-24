@@ -1,4 +1,4 @@
-"""Tests for Domain-Specific Default Policy Profiles feature in ClauseLens."""
+"""Tests for Domain-Specific Default Policy Profiles feature in ClauseSight."""
 import io
 import json
 import os
